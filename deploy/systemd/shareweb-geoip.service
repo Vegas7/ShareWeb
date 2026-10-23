@@ -1,0 +1,14 @@
+[Unit]
+Description=ShareWeb GeoIP database update (DB-IP Lite, CC BY 4.0)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=shareweb
+Group=shareweb
+ExecStart=/opt/shareweb/geoip/update-geoip.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true

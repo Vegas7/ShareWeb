@@ -1,0 +1,16 @@
+[Unit]
+Description=ShareWeb expired share cleanup
+After=network.target
+
+[Service]
+Type=oneshot
+User=shareweb
+Group=shareweb
+WorkingDirectory=/opt/shareweb
+EnvironmentFile=/opt/shareweb/.env
+ExecStart=/opt/shareweb/venv/bin/python -c "from app.database import init_db; from app.services import cleanup_expired; init_db(); print('removed', cleanup_expired())"
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/shareweb/data /opt/shareweb/logs /opt/shareweb/database

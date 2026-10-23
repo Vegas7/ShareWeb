@@ -1,0 +1,23 @@
+# 追加到 /etc/caddy/Caddyfile, 把域名换成自己的; Caddy 会自动申请 HTTPS 证书。
+share.example.com {
+    encode zstd gzip
+
+    # 不限制请求体大小: 单文件上限由 ShareWeb 管理后台「高级设置」控制
+    # (应用内按设置值及磁盘剩余空间拦截)。
+
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options    "nosniff"
+        Referrer-Policy           "same-origin"
+    }
+
+    # 浏览器默认请求的 /favicon.ico 指向静态文件
+    rewrite /favicon.ico /static/favicon.ico
+
+    reverse_proxy 127.0.0.1:8000 {
+        # 与 app/deps.py 的 client_ip() 配合, 取到访客真实 IP
+        header_up X-Real-IP {remote_host}
+        # 大文件上传: 不缓冲上行请求体, 边收边转发
+        flush_interval -1
+    }
+}

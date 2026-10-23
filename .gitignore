@@ -1,0 +1,22 @@
+# 运行时数据 (部署目录里才有, 不进仓库)
+.env
+data/
+database/
+logs/
+geoip/
+*.mmdb
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# 编辑器 / 系统
+.cache/
+.vscode/
+.idea/
+.DS_Store

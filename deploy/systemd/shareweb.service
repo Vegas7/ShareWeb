@@ -1,0 +1,21 @@
+[Unit]
+Description=ShareWeb FastAPI service
+After=network.target
+
+[Service]
+Type=simple
+User=shareweb
+Group=shareweb
+WorkingDirectory=/opt/shareweb
+EnvironmentFile=/opt/shareweb/.env
+ExecStart=/opt/shareweb/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/shareweb/data /opt/shareweb/logs /opt/shareweb/database
+
+[Install]
+WantedBy=multi-user.target

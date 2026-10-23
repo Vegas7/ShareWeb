@@ -1,0 +1,400 @@
+:root{
+  --bg:#eef1f7; --bg2:#e6eaf3;
+  --card:#ffffff; --card-border:#e5e8f0;
+  --text:#141a29; --muted:#697086; --faint:#8a91a6;
+  --accent:#4f46e5; --accent-press:#4338ca; --accent-soft:#eef0ff;
+  /* 默认按钮与暗色模式一致, 用主题紫色 */
+  --dark:#4f46e5; --dark-press:#4338ca;
+  --ok:#0f9d58; --ok-soft:#e7f6ec;
+  --warn:#c2410c; --warn-soft:#fdeee4;
+  --danger:#dc2626; --danger-soft:#fdecec;
+  --field:#ffffff; --field-border:#d5dae6;
+  --shadow:0 12px 34px rgba(20,30,55,.08);
+  --radius:18px;
+  /* 提取码四个框: 单框宽/高、字号、间距; 首页按钮宽度与四个框总宽一致 */
+  --code-box-w:72px; --code-box-h:96px; --code-font:64px; --code-gap:12px;
+  color-scheme:light;
+}
+/* 暗色: 跟随系统, 除非用户手动选了亮色; 手动选暗色时无论系统如何都生效 */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c0f17; --bg2:#0a0d14;
+    --card:#141926; --card-border:#232a3b;
+    --text:#e8ebf4; --muted:#9aa2b8; --faint:#767e93;
+    --accent:#8b83ff; --accent-press:#a79fff; --accent-soft:#20233a;
+    /* 深色模式下默认按钮也用紫色 (原来是近白色按钮+白字,看不清) */
+    --dark:#8b83ff; --dark-press:#a79fff;
+    --ok:#37d180; --ok-soft:#123024;
+    --warn:#f59e5b; --warn-soft:#3a2415;
+    --danger:#f87171; --danger-soft:#3a1a1a;
+    --field:#0f1420; --field-border:#2b3348;
+    --shadow:0 14px 40px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c0f17; --bg2:#0a0d14;
+  --card:#141926; --card-border:#232a3b;
+  --text:#e8ebf4; --muted:#9aa2b8; --faint:#767e93;
+  --accent:#8b83ff; --accent-press:#a79fff; --accent-soft:#20233a;
+  --dark:#8b83ff; --dark-press:#a79fff;
+  --ok:#37d180; --ok-soft:#123024;
+  --warn:#f59e5b; --warn-soft:#3a2415;
+  --danger:#f87171; --danger-soft:#3a1a1a;
+  --field:#0f1420; --field-border:#2b3348;
+  --shadow:0 14px 40px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+/* 提取码数字字体: Tilt Neon (SIL OFL), 自托管, 仅含 0-9 子集 (约 2KB) */
+@font-face{font-family:"Tilt Neon";font-style:normal;font-weight:400;font-display:swap;src:url(/static/fonts/tilt-neon-digits.woff2) format("woff2");unicode-range:U+30-39}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(900px 500px at 100% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    linear-gradient(180deg,var(--bg),var(--bg2));
+  background-attachment:fixed;
+  line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+/* 页面宽度: 现代常用的 1200px 内容宽度, 两侧固定留白 (桌面 24px, 手机 16px) */
+.container{width:min(1200px,calc(100% - 48px));margin:36px auto 60px}
+/* 超宽且未开系统缩放的屏幕 (如 4K 显示器 100% 缩放): 整页等比放大, 内容占比与字号回到正常水平。
+   已开 150%/200% 缩放的 4K 屏 (浏览器宽度约 2560/1920, 像素比 ≥1.5) 不受影响。 */
+@media (min-width:2560px) and (max-resolution:1.25dppx){html{zoom:1.25}}
+@media (min-width:3200px) and (max-resolution:1.25dppx){html{zoom:1.5}}
+.narrow{width:min(680px,92vw)}
+header{margin-bottom:20px}
+h1{font-size:26px;letter-spacing:-.02em;margin:0 0 2px}
+h2{font-size:18px;letter-spacing:-.01em;margin:0 0 12px}
+h3{font-size:15px;margin:0 0 8px}
+p{margin-top:0}
+/* 品牌区: 标题+副标题收紧行高, 图标高度与两行文字的总高度一致 (30px + 22px = 52px) */
+.brand{display:flex;align-items:center;gap:14px}
+.brand h1,.brand .brand-name{margin:0;font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:30px}
+.brand-link{color:inherit;text-decoration:none}
+.brand-link:hover .brand-name{color:var(--accent)}
+.brand p{line-height:22px}
+.brand .logo.cloud{background:var(--card);border:1px solid var(--card-border);box-shadow:var(--shadow);padding:5px}
+.brand .logo.cloud img{width:100%;height:100%;display:block}
+.brand .logo{width:52px;height:52px;flex-shrink:0;border-radius:14px;display:grid;place-items:center;font-size:26px;
+  background:linear-gradient(140deg,var(--accent),#8b5cf6);color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 40%,transparent)}
+/* 顶栏: 放不下时右侧按钮组换到下一行并靠右 (只在真的放不下时才换行, 如手机上的管理页) */
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.topbar .back{margin-bottom:0}
+header.topbar{margin-bottom:20px}
+.topbar-end{display:flex;align-items:center;gap:12px;margin-left:auto}
+#logout{white-space:nowrap}
+.prefs{display:flex;gap:8px;flex-shrink:0}
+/* 子页面右上角的「首页」按钮: 与语言/主题按钮同款同尺寸, 只显示房子图标; 文字仅供读屏软件 */
+.topbar-end.nav{gap:8px}
+.home-btn{text-decoration:none}
+.home-btn span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pref-btn{height:36px;min-width:36px;padding:0 10px;border:1px solid var(--card-border);border-radius:10px;background:var(--card);color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(20,30,55,.06);transition:.15s ease}
+.pref-btn:hover{border-color:var(--accent);color:var(--accent)}
+.pref-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:24px;margin-bottom:18px;box-shadow:var(--shadow)}
+.dropzone{border:2px dashed var(--field-border);border-radius:16px;padding:44px 20px;text-align:center;cursor:pointer;transition:.18s ease;background:color-mix(in srgb,var(--accent) 3%,transparent)}
+.dropzone:hover{border-color:var(--accent)}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005)}
+.drop-icon{font-size:40px;line-height:1}
+button,.button{font:inherit}
+.primary,.button{border:0;border-radius:12px;background:var(--dark);color:#fff;padding:12px 18px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:6px;transition:.15s ease}
+.primary:hover,.button:hover{background:var(--dark-press);transform:translateY(-1px)}
+.primary:active{transform:translateY(0)}
+.primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn-icon{width:1.15em;height:1.15em;flex-shrink:0}
+.primary.accent{background:var(--accent)}
+.primary.accent:hover{background:var(--accent-press)}
+.wide{width:100%;margin-top:12px}
+.divider{text-align:center;color:var(--faint);margin:16px 0;position:relative}
+.divider::before,.divider::after{content:"";position:absolute;top:50%;width:42%;height:1px;background:var(--card-border)}
+.divider::before{left:0}.divider::after{right:0}
+.textpaste{width:100%;min-height:150px;resize:vertical;border:1px solid var(--field-border);border-radius:12px;padding:13px;font:inherit;background:var(--field);color:var(--text)}
+.textpaste:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);border-color:var(--accent)}
+.hidden{display:none!important}
+.row{display:flex;gap:10px;align-items:center}
+.between{justify-content:space-between}
+.input{flex:1;border:1px solid var(--field-border);border-radius:10px;padding:11px 12px;font:inherit;background:var(--field);color:var(--text)}
+.input:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);border-color:var(--accent)}
+.progress{height:10px;background:color-mix(in srgb,var(--muted) 22%,transparent);border-radius:999px;overflow:hidden;margin-top:16px}
+.progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#8b5cf6);transition:width .2s}
+.result-box{background:color-mix(in srgb,var(--accent) 5%,transparent);border:1px solid var(--card-border);border-radius:14px;padding:18px;margin-top:16px}
+.result-box code{word-break:break-all;background:color-mix(in srgb,var(--muted) 14%,transparent);padding:2px 6px;border-radius:6px;font-size:12.5px}
+/* 提取码输入框: 竖长方形 */
+.code-inputs{display:grid;grid-template-columns:repeat(4,var(--code-box-w));justify-content:center;gap:var(--code-gap);margin:4px auto 0}
+/* 首页的主要按钮: 与四个提取码框同宽并居中 */
+.narrow-btn{display:flex;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:14px auto 0}
+.code-inputs input{width:100%;height:var(--code-box-h);padding:0;text-align:center;font-family:"Tilt Neon",system-ui,sans-serif;font-size:var(--code-font);font-weight:400;border:1px solid var(--field-border);border-radius:14px;background:var(--field);color:var(--text)}
+.code-inputs input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+.sender-history{display:grid;gap:10px;margin-top:10px}
+/* 分享页 GitHub 直链行 (输入框 + 打开按钮) */
+.history-url{display:flex;gap:10px;align-items:center}
+.history-url .input{min-width:0}
+.code{font-size:30px;letter-spacing:9px;font-weight:800;color:var(--accent)}
+/* 上传结果: 整体居中 —— 标题/文件信息 → 提取码 → 链接 → 分隔线 → SHA-256 (次要信息放最后) */
+.result-box.centered{text-align:center;padding:26px 22px 20px}
+.result-box.centered h2{margin-bottom:6px}
+.result-file{font-weight:600;font-size:17px;overflow-wrap:anywhere;margin:0}
+.result-meta{margin:4px 0 0}
+/* 每个区块: 标题行 (左: 标题, 右: 点击复制提示) + 内容, 宽度与内容框一致, 整体居中 */
+.copy-block{width:min(100%,560px);margin:18px auto 0;display:flex;flex-direction:column;gap:8px;text-align:left}
+.copy-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.copy-label{font-size:13px;color:var(--muted)}
+/* 可点击复制的框: 提取码、链接 (上传结果与本地历史) 同一种样式 */
+.copy-box{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--field-border);border-radius:14px;cursor:pointer;transition:border-color .2s ease,background-color .2s ease,color .2s ease,transform .12s ease}
+.copy-box:hover{border-color:var(--accent);color:var(--accent)}
+.copy-box:active{transform:scale(.985)}
+.copy-box:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.copy-box.copied{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,var(--field))}
+/* 提取码: 与提取页一样的四个竖框, 整组 (含框间空隙) 作为一个按钮; 按钮只包住四个框, 两侧空白不可点 */
+.copy-code-group{display:flex;align-self:center;gap:var(--code-gap);width:auto;padding:0;margin:6px 0;background:none;border:0;cursor:pointer;font:inherit}
+.copy-code-group:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:14px}
+.cbox{width:var(--code-box-w);height:var(--code-box-h);display:grid;place-items:center;font-family:"Tilt Neon",system-ui,sans-serif;font-size:var(--code-font);line-height:1;color:var(--accent);background:var(--field);border:1px solid var(--field-border);border-radius:14px;transition:border-color .2s ease,background-color .2s ease,transform .12s ease}
+.copy-code-group:hover .cbox{border-color:var(--accent)}
+.copy-code-group:active .cbox{transform:scale(.97)}
+.copy-code-group.copied .cbox{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,var(--field))}
+/* 链接: 固定宽度的框里单行显示, 超长部分以省略号结尾 (点击复制的是完整链接, 悬停可看全文) */
+.copy-link{display:block;padding:12px 16px;font-size:15px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.copy-hint{font-size:12px;color:var(--faint);min-height:18px;transition:color .2s ease}
+.copy-hint.done{color:var(--ok)}
+.copy-hint.fail{color:var(--danger)}
+.result-divider{height:1px;width:min(100%,560px);margin:22px auto 0;background:var(--card-border)}
+.result-sha{margin-top:14px}
+.copy-sha{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;color:var(--muted);background:none;border:1px dashed transparent;border-radius:8px;padding:4px 8px;margin-left:-8px;text-align:left;word-break:break-all;cursor:pointer;transition:color .2s ease,border-color .2s ease}
+.copy-sha:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.copy-sha.copied{color:var(--ok);border-color:var(--ok)}
+/* 提取页的 SHA-256: 同款样式, 但跟随页面居左、占满宽度 */
+.copy-block.share-sha{width:auto;margin:16px 0 0}
+.share-sha .copy-sha{align-self:flex-start;max-width:100%}
+/* 本地历史: 同样的复制框, 但居左、紧凑 */
+.copy-inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.copy-inline .copy-hint{min-height:0}
+.history-code-box{font-family:"Tilt Neon",system-ui,sans-serif;font-size:26px;line-height:1;letter-spacing:.12em;padding:6px 10px 6px calc(10px + .12em);color:var(--accent);border-radius:10px}
+/* 历史里的链接: 与 SHA-256 一样透明, 悬停才出现虚线框, 框只包住文字 */
+.copy-box.history-link-box{flex:0 1 auto;min-width:0;text-align:left;padding:4px 8px;margin-left:-8px;font-size:13px;line-height:1.5;word-break:break-all;color:var(--muted);background:none;border:1px dashed transparent;border-radius:8px}
+.copy-box.history-link-box:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.copy-box.history-link-box.copied{color:var(--ok);border-color:var(--ok);background:none}
+.copy{margin-left:8px}
+.history-item{padding:13px 0;border-bottom:1px solid var(--card-border)}
+.history-item:last-child{border-bottom:0}
+.history-link{color:var(--text);text-decoration:none;font-weight:600}
+.history-link:hover{color:var(--accent)}
+/* 清除按钮: 两种状态内边距相同, 变成「确认」时只换颜色, 不会挤动布局 */
+.history-actions{display:flex;align-items:center;gap:4px}
+.history-actions .link{padding:4px 10px;border-radius:10px;transition:background-color .24s cubic-bezier(.2,.8,.2,1),color .24s cubic-bezier(.2,.8,.2,1),box-shadow .24s cubic-bezier(.2,.8,.2,1)}
+.history-actions .link.armed{background:var(--danger);color:#fff;text-decoration:none;box-shadow:0 4px 12px color-mix(in srgb,var(--danger) 30%,transparent)}
+.history-actions .link.anim-arm{animation:sw-arm .26s cubic-bezier(.2,.8,.2,1)}
+.history-actions .link.anim-disarm{animation:sw-fade .24s ease-out}
+@keyframes sw-arm{from{opacity:.5;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes sw-fade{from{opacity:.35}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.history-actions .link{transition:none}.history-actions .link.anim-arm,.history-actions .link.anim-disarm{animation:none}}
+.history-status .tag{margin-left:8px;vertical-align:1px}
+.tag.gone{background:var(--danger-soft);color:var(--danger)}
+.history-item.gone .history-link,.history-item.gone b{color:var(--faint);text-decoration:line-through}
+/* 已删除/已过期的条目: 提取码和链接已不可用, 不再显示, 只保留名称 + 标签 + 时间 */
+.history-item.gone .sender-history{display:none}
+.meta{font-size:13px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.danger{color:var(--danger)}
+.link{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-weight:600}
+.link:hover{text-decoration:underline}
+.link:disabled{color:var(--faint);cursor:default;text-decoration:none}
+.error{color:var(--danger);margin-top:8px;min-height:1em}
+/* 没有错误时不占位, 否则按钮下方会比其它卡片多出一截空白 */
+.error:empty{display:none}
+.center{text-align:center}
+.back{display:inline-block;margin-bottom:16px;color:var(--accent);text-decoration:none;font-weight:600}
+.back:hover{text-decoration:underline}
+.text-content{white-space:pre-wrap;word-break:break-word;background:var(--field);border:1px solid var(--card-border);border-radius:12px;padding:16px;cursor:pointer;max-height:70vh;overflow:auto;font-size:14px}
+/* encrypted download block */
+.enc-box{margin-top:20px;border-top:1px solid var(--card-border);padding-top:18px}
+.enc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between}
+.keyfield{display:flex;gap:8px;align-items:center;margin-top:10px}
+.keyfield .input{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.note{font-size:13px;color:var(--muted);background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin-top:12px}
+.note b{color:var(--text)}
+.steps{padding-left:20px;font-size:14px;color:var(--text)}
+.steps li{margin:6px 0}
+kbd{background:var(--field);border:1px solid var(--field-border);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
+/* admin */
+.danger-btn{background:var(--danger)!important}
+.danger-btn:hover:not(:disabled){filter:brightness(.92)}
+.check{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:14px}
+.check input,.file-row input{width:18px;height:18px;margin:0;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.file-list{border:1px solid var(--card-border);border-radius:12px;max-height:460px;overflow:auto}
+.file-row{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--card-border);cursor:pointer;transition:background .12s}
+.file-row:last-child{border-bottom:0}
+.file-row:hover{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.file-row.selected{background:var(--accent-soft)}
+.file-row input{margin-top:3px}
+.file-main{min-width:0;flex:1}
+.file-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+.file-name{color:var(--text);font-weight:600;text-decoration:none;word-break:break-all}
+.file-name:hover{color:var(--accent);text-decoration:underline}
+.file-size{flex-shrink:0;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.file-row .tag{margin-left:6px;vertical-align:1px}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.file-empty{padding:22px;text-align:center}
+.cleanup-row{margin-top:14px}
+.sort-ctl{display:inline-flex;align-items:center;gap:8px}
+.sort-ctl > span{white-space:nowrap}
+/* 选择器: 比手机端 .input{width:100%} 更具体, 保持自然宽度 */
+.file-head .sort-select{flex:none;width:auto;min-width:0;padding:7px 30px 7px 10px;font-size:14px;cursor:pointer}
+.files-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin:6px 0 10px}
+/* 文件列表表头: 全选框与每行勾选框同一列 (同样的左内边距 14px 与间距 12px), 滚动时固定在顶部 */
+.file-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--card-border);background:color-mix(in srgb,var(--muted) 7%,var(--card))}
+.file-head .check{gap:12px}
+.file-head .spacer{flex:1}
+.file-head .pref-btn{height:34px;min-width:34px}
+/* 排序下拉框与方向按钮作为一组, 换行时一起换, 不会把箭头单独挤到下一行 */
+.sort-group{display:flex;align-items:center;gap:8px;margin-left:auto}
+@media(max-width:480px){
+  /* 窄屏: 排序/筛选控件单独占一行, 下拉框平分宽度, 不会把箭头按钮挤出去 */
+  .sort-group{width:100%;margin-left:0}
+  .sort-group > .sort-select{flex:0 0 auto}
+  .sort-group > .sort-ctl{flex:1 1 0;min-width:0}
+  .file-head .sort-ctl .sort-select{width:100%}
+  /* 窄屏隐藏「排序」二字 (下拉框本身已说明), 仅保留给读屏软件 */
+  .sort-ctl > span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+/* 极窄屏: 筛选下拉框单独一行, 排序下拉框 + 方向按钮在下一行 */
+@media(max-width:360px){
+  .sort-group{flex-wrap:wrap}
+  .sort-group > .sort-select{flex:1 1 100%}
+}
+.files-actions .primary{padding:9px 14px}
+.vis-ip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:600;word-break:break-all}
+.vis-hits{flex-shrink:0;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.vis-add{margin-top:14px}
+.vis-add .meta{display:block;margin-bottom:6px}
+.vis-credit{font-size:11px;margin:10px 0 0}
+.vis-credit a{color:inherit}
+.tag.lock{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+.stat span{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
+.stat b{font-size:26px;letter-spacing:-.02em}
+.codearea{position:relative}
+.codearea textarea{height:230px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--field)}
+.codearea .primary{position:absolute;top:10px;right:10px;padding:6px 12px;font-size:12px}
+hr.sep{border:0;border-top:1px solid var(--card-border);margin:22px 0}
+@media(max-width:700px){
+  .container{width:calc(100% - 32px);margin:18px auto 40px}
+  .card{padding:17px}
+  .dropzone{padding:32px 12px}
+  .row{flex-wrap:wrap}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .input{min-width:0;width:100%}
+  .code{font-size:26px;letter-spacing:7px}
+  .history-url{flex-wrap:wrap}
+  .history-url .input{width:100%}
+  .copy-link{font-size:13.5px}
+  :root{--code-box-w:60px; --code-box-h:80px; --code-font:54px; --code-gap:10px}
+}
+/* 极窄屏 (≤360px, 如 iPhone SE): 提取码框再小一点, 保证四个框和按钮都在卡片内容区内 */
+@media(max-width:360px){:root{--code-box-w:56px; --code-box-h:74px; --code-font:48px; --code-gap:8px}}
+/* 窄屏: 品牌区缩小 (图标高度仍与两行文字一致: 26+18=44), 给右上角的首页/语言/主题按钮留位置 */
+@media(max-width:420px){
+  .brand{gap:10px}
+  .brand .logo{width:44px;height:44px;border-radius:12px}
+  .brand h1,.brand .brand-name{font-size:22px;line-height:26px}
+  .brand p{font-size:13px;line-height:18px}
+}
+
+/* ---- 管理后台: 左侧菜单 + 右侧内容 ---- */
+/* 始终预留滚动条位置: 否则长的标签页 (如总览) 出现滚动条、短的没有, 切换时页宽会变、内容左右跳 */
+html.admin-page{scrollbar-gutter:stable}
+.admin-layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px;align-items:start}
+.admin-nav{position:sticky;top:20px;display:flex;flex-direction:column;gap:4px;padding:10px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.admin-nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:11px;color:var(--muted);font-weight:600;font-size:14.5px;text-decoration:none;white-space:nowrap;transition:background-color .15s,color .15s}
+.admin-nav a svg{flex-shrink:0}
+.admin-nav a:hover{color:var(--text);background:color-mix(in srgb,var(--muted) 9%,transparent)}
+.admin-nav a.active{color:var(--accent);background:var(--accent-soft)}
+.admin-nav a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* 所有标签页统一宽度: 宽度只来自 .admin-main 这一列 (minmax(0,1fr) 防止宽内容把列撑大) */
+.admin-main,.admin-view{min-width:0;width:100%}
+.admin-view{display:none}
+.admin-view.active{display:block}
+.admin-view > :last-child{margin-bottom:0}
+@media(max-width:820px){
+  .admin-layout{grid-template-columns:minmax(0,1fr);gap:14px}
+  .admin-nav{position:static;flex-direction:row;overflow-x:auto;padding:6px;scrollbar-width:none}
+  .admin-nav::-webkit-scrollbar{display:none}
+  .admin-nav a{flex:1 0 auto;justify-content:center;padding:9px 12px}
+}
+@media(max-width:420px){.admin-nav a svg{display:none}}
+
+/* ---- 总览图表 (颜色: 分类色 1 蓝 / 2 橙, 已按亮/暗两种卡片底色校验对比度与色弱区分度) ---- */
+.viz{--s1:#2a78d6;--s2:#eb6834;--track:#cde2fb;--grid:color-mix(in srgb,var(--muted) 18%,transparent);--other:color-mix(in srgb,var(--muted) 45%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .viz{--s1:#3987e5;--s2:#d95926;--track:#1b2a44}}
+:root[data-theme="dark"] .viz{--s1:#3987e5;--s2:#d95926;--track:#1b2a44}
+.viz h2{margin-bottom:4px}
+.chart-sub{margin:0 0 14px}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.chart-legend{display:flex;gap:16px;font-size:13px;color:var(--muted)}
+.chart-legend > span{display:inline-flex;align-items:center;gap:6px}
+.key{display:inline-block;flex-shrink:0}
+.key.line{width:14px;height:3px;border-radius:2px}
+.key.dot{width:10px;height:10px;border-radius:3px}
+.key.s1{background:var(--s1)}.key.s2{background:var(--s2)}.key.other{background:var(--other)}.key.track{background:var(--track);box-shadow:inset 0 0 0 1px var(--card-border)}
+.seg{display:inline-flex;padding:3px;gap:2px;border:1px solid var(--card-border);border-radius:11px;background:var(--field)}
+.seg button{border:0;background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:5px 11px;border-radius:8px;cursor:pointer}
+.seg button:hover{color:var(--text)}
+.seg button.active{background:var(--accent-soft);color:var(--accent)}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:inherit;font-size:11.5px;fill:var(--muted)}
+.chart .grid line{stroke:var(--grid);stroke-width:1}
+.chart .lbl{fill:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.chart .cat{fill:var(--text);font-size:13px}
+.chart .hit{fill:transparent;cursor:crosshair}
+.chart .xhair{stroke:var(--muted);stroke-width:1;opacity:.5}
+.chart-empty{padding:28px 0;text-align:center}
+.viz-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.viz-grid > .card{margin-bottom:18px}
+@media(max-width:1000px){.viz-grid{grid-template-columns:minmax(0,1fr);gap:0}}
+.chart-tip{position:fixed;z-index:50;pointer-events:none;min-width:120px;padding:8px 11px;border-radius:10px;font-size:12.5px;line-height:1.5;background:var(--card);color:var(--text);border:1px solid var(--card-border);box-shadow:0 8px 24px rgba(20,30,55,.16)}
+.chart-tip b{display:block;margin-bottom:2px}
+.chart-tip .tip-row{display:flex;align-items:center;gap:6px;justify-content:space-between}
+.chart-tip .tip-row > span:first-child{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.chart-tip .tip-row > span:last-child{font-variant-numeric:tabular-nums;font-weight:600}
+/* 磁盘: 一条堆叠的容量条 + 数字 */
+.disk-bar{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden;background:var(--track);margin:6px 0 14px}
+.disk-bar > span{display:block;height:100%;min-width:2px}
+.disk-bar .s1{background:var(--s1)}.disk-bar .other{background:var(--other)}
+.disk-big{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.disk-big small{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:0;margin-left:6px}
+.disk-legend{display:grid;gap:8px;font-size:13.5px}
+.disk-legend > div{display:flex;align-items:center;gap:8px}
+.disk-legend b{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}
+.disk-state{display:inline-flex;align-items:center;gap:5px;margin-left:8px;vertical-align:4px}
+
+/* ---- 高级设置 ---- */
+.limit-options{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+.limit-opt{position:relative;cursor:pointer}
+.limit-opt input{position:absolute;opacity:0;pointer-events:none}
+.limit-opt span{display:inline-flex;align-items:center;justify-content:center;min-width:86px;padding:9px 14px;border:1px solid var(--field-border);border-radius:11px;background:var(--field);font-weight:600;font-size:14px;transition:.15s}
+.limit-opt:hover span{border-color:var(--accent)}
+.limit-opt input:checked + span{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.limit-opt input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.limit-custom{margin-top:10px;max-width:320px}
+.limit-custom .input{flex:1}
+.limit-custom select.input{flex:0 0 auto;width:auto;padding:11px 30px 11px 12px}
+.limit-info{margin-top:14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--muted) 7%,transparent);font-size:13.5px;color:var(--muted);display:grid;gap:4px}
+.limit-info b{color:var(--text);font-variant-numeric:tabular-nums}
+.limit-info .warn{color:var(--warn)}
+.setting-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
+.setting-row h2{margin-bottom:6px}
+/* 开关 */
+.switch{position:relative;flex-shrink:0;width:46px;height:26px;margin-top:2px;cursor:pointer}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.switch span{position:absolute;inset:0;border-radius:999px;background:color-mix(in srgb,var(--muted) 35%,transparent);transition:background-color .18s}
+.switch span::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+.switch input:checked + span{background:var(--accent)}
+.switch input:checked + span::after{transform:translateX(20px)}
+.switch input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.switch input:disabled + span{opacity:.55}

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en" class="admin-page">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n="admin.pageTitle">Admin · ShareWeb</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261022-28">
+  <script src="/static/js/prefs.js?v=20261022-2"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">⚙</div>
+        <div>
+          <h1 data-i18n="admin.title">Admin</h1>
+          <p class="muted" style="margin:0" data-i18n="admin.subtitle">Administrators only</p>
+        </div>
+      </div>
+      <div class="topbar-end">
+        <button id="logout" class="link hidden" data-i18n="admin.logout">Log out</button>
+        <div class="topbar-end nav">
+          <a class="pref-btn home-btn" href="/" data-i18n-title="nav.home" title="Home"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9v11a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/></svg><span data-i18n="nav.home">Home</span></a>
+          <div class="prefs" data-prefs></div>
+        </div>
+      </div>
+    </header>
+
+    <section id="loginCard" class="card">
+      <h2 data-i18n="admin.loginTitle">Admin login</h2>
+      <input id="adminPw" class="input" type="password" placeholder="Admin password" data-i18n-placeholder="admin.pwPh" style="width:100%">
+      <button id="login" class="primary accent wide" data-i18n="admin.login">Log in</button>
+      <div id="loginErr" class="error"></div>
+    </section>
+
+    <div id="panel" class="admin-layout hidden">
+      <!-- 左侧菜单: 桌面端固定在左侧, 窄屏时变成顶部可横向滚动的标签栏 -->
+      <nav class="admin-nav" aria-label="Admin sections">
+        <a href="#overview" data-view="overview"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span data-i18n="admin.navOverview">Overview</span></a>
+        <a href="#files" data-view="files"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span data-i18n="admin.navFiles">Files</span></a>
+        <a href="#security" data-view="security"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/></svg><span data-i18n="admin.navSecurity">Security</span></a>
+        <a href="#advanced" data-view="advanced"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-i18n="admin.navAdvanced">Advanced</span></a>
+      </nav>
+
+      <!-- 每个标签页 = 左侧菜单里一个 <a href="#名称" data-view="名称"> + 这里一个 <div class="admin-view" data-view="名称">。
+           页宽由外层网格决定, 与标签页内容无关; 新增标签页照此添加即可, 不要给 .admin-view 单独设宽度。 -->
+      <div class="admin-main">
+        <!-- 总览 -->
+        <div class="admin-view" data-view="overview">
+          <section class="stats-grid">
+            <div class="stat"><span data-i18n="admin.statShares">Active shares</span><b id="activeShares">0</b></div>
+            <div class="stat"><span data-i18n="admin.statFiles">Files</span><b id="fileCount">0</b></div>
+            <div class="stat"><span data-i18n="admin.statBytes">Storage used</span><b id="fileBytes">0 B</b></div>
+            <div class="stat"><span data-i18n="admin.statBlacklist">Blacklist</span><b id="blacklistCount">0</b></div>
+            <div class="stat"><span data-i18n="admin.statUploads">Uploads today</span><b id="todayUploads">0</b></div>
+            <div class="stat"><span data-i18n="admin.statDownloads">Downloads today</span><b id="todayDownloads">0</b></div>
+          </section>
+
+          <section class="card viz">
+            <div class="chart-head">
+              <div>
+                <h2 data-i18n="admin.trendTitle">Uploads &amp; downloads</h2>
+                <div class="chart-legend">
+                  <span><i class="key line s1"></i><span data-i18n="admin.trendUploads">Uploads</span></span>
+                  <span><i class="key line s2"></i><span data-i18n="admin.trendDownloads">Downloads</span></span>
+                </div>
+              </div>
+              <div class="seg" id="trendRange" role="group" aria-label="Range">
+                <button type="button" data-days="7" data-i18n="admin.days7">7 days</button>
+                <button type="button" data-days="14" data-i18n="admin.days14">14 days</button>
+                <button type="button" data-days="30" data-i18n="admin.days30">30 days</button>
+              </div>
+            </div>
+            <div class="chart" id="trendChart"></div>
+          </section>
+
+          <div class="viz-grid">
+            <section class="card viz">
+              <h2 data-i18n="admin.typesTitle">Storage by type</h2>
+              <p class="meta chart-sub" data-i18n="admin.typesSub">Active shares, by size</p>
+              <div class="chart" id="typesChart"></div>
+            </section>
+            <section class="card viz">
+              <h2 data-i18n="admin.diskTitle">Disk space</h2>
+              <p class="meta chart-sub" id="diskSub"></p>
+              <div id="diskChart"></div>
+            </section>
+          </div>
+
+          <section class="card viz">
+            <h2 data-i18n="admin.geoTitle">Visitors by country</h2>
+            <p class="meta chart-sub" data-i18n="admin.geoSub">Unique IPs recorded in the visitor log</p>
+            <div class="chart" id="geoChart"></div>
+          </section>
+        </div>
+
+        <!-- 文件管理 -->
+        <div class="admin-view" data-view="files">
+          <section class="card" id="filesCard">
+            <div class="row between" style="margin-bottom:6px">
+              <h2 style="margin:0" data-i18n="admin.filesTitle">Files</h2>
+              <span class="meta" id="filesSummary"></span>
+            </div>
+            <div class="files-actions">
+              <button class="primary" id="lockSelected" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span data-i18n="admin.lock">Lock</span></button>
+              <button class="primary" id="unlockSelected" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-1.9"/></svg><span data-i18n="admin.unlock">Unlock</span></button>
+              <button class="primary danger-btn" id="deleteSelected" disabled data-i18n="admin.deleteSelected">Delete selected</button>
+            </div>
+            <div id="fileList" class="file-list">
+              <div class="file-head">
+                <label class="check"><input type="checkbox" id="selectAll"><span data-i18n="admin.selectAll">Select all</span></label>
+                <span class="meta" id="selCount"></span>
+                <span class="spacer"></span>
+                <div class="sort-group">
+                  <label class="sort-ctl">
+                    <span class="meta" data-i18n="admin.sortBy">Sort by</span>
+                    <select id="sortKey" class="input sort-select">
+                      <option value="date" data-i18n="admin.sortDate">Date</option>
+                      <option value="size" data-i18n="admin.sortSize">Size</option>
+                      <option value="type" data-i18n="admin.sortType">Type</option>
+                      <option value="name" data-i18n="admin.sortName">Name</option>
+                    </select>
+                  </label>
+                  <button type="button" class="pref-btn" id="sortDir"></button>
+                </div>
+              </div>
+              <div id="fileRows"></div>
+            </div>
+            <div class="row cleanup-row">
+              <button class="primary cleanup-btn" data-days="7" data-i18n="admin.cleanup7">Delete files older than 7 days</button>
+              <button class="primary cleanup-btn" data-days="14" data-i18n="admin.cleanup14">Delete files older than 14 days</button>
+              <button class="primary cleanup-btn danger-btn" data-days="all" data-i18n="admin.cleanupAll">Delete all files</button>
+            </div>
+            <p class="meta" style="margin:10px 0 0" data-i18n="admin.cleanupDesc">Only stored file shares are deleted, and this cannot be undone. Text shares and locked files are not affected.</p>
+            <div id="cleanupMsg" class="meta" style="margin-top:6px"></div>
+          </section>
+        </div>
+
+        <!-- 安全设置 -->
+        <div class="admin-view" data-view="security">
+          <section class="card" id="visitorsCard">
+            <div class="row between" style="margin-bottom:6px">
+              <h2 style="margin:0" data-i18n="admin.visTitle">Visitors &amp; blocklist</h2>
+              <span class="meta" id="visSummary"></span>
+            </div>
+            <div class="files-actions">
+              <button class="primary" id="allowSelected" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg><span data-i18n="admin.visAllow">Allow</span></button>
+              <button class="primary danger-btn" id="blockSelected" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg><span data-i18n="admin.visBlock">Block</span></button>
+            </div>
+            <div id="visList" class="file-list">
+              <div class="file-head">
+                <label class="check"><input type="checkbox" id="visSelectAll"><span data-i18n="admin.selectAll">Select all</span></label>
+                <span class="meta" id="visSelCount"></span>
+                <span class="spacer"></span>
+                <div class="sort-group">
+                  <select id="visFilter" class="input sort-select" aria-label="Filter">
+                    <option value="all" data-i18n="admin.visFilterAll">All</option>
+                    <option value="blocked" data-i18n="admin.visFilterBlocked">Blocked</option>
+                  </select>
+                  <label class="sort-ctl">
+                    <span class="meta" data-i18n="admin.sortBy">Sort by</span>
+                    <select id="visSortKey" class="input sort-select">
+                      <option value="last" data-i18n="admin.visSortLast">Last seen</option>
+                      <option value="hits" data-i18n="admin.visSortHits">Requests</option>
+                      <option value="first" data-i18n="admin.visSortFirst">First seen</option>
+                      <option value="ip" data-i18n="admin.visSortIp">IP</option>
+                      <option value="country" data-i18n="admin.visSortCountry">Country</option>
+                    </select>
+                  </label>
+                  <button type="button" class="pref-btn" id="visSortDir"></button>
+                </div>
+              </div>
+              <div id="visRows"></div>
+            </div>
+            <div class="vis-add">
+              <span class="meta" data-i18n="admin.blAddTitle">Add to blacklist</span>
+              <div class="row">
+                <input id="blIp" class="input" placeholder="IP address" data-i18n-placeholder="admin.ipPh">
+                <input id="blReason" class="input" placeholder="Reason" data-i18n-placeholder="admin.reasonPh">
+                <button id="blAdd" class="primary accent" data-i18n="admin.blAdd">Add</button>
+              </div>
+            </div>
+            <div id="visMsg" class="meta" style="margin-top:8px"></div>
+            <p class="faint vis-credit"><span data-i18n="admin.visCredit">IP location data</span>: <a href="https://db-ip.com" target="_blank" rel="noopener">IP Geolocation by DB-IP</a> (CC BY 4.0)</p>
+          </section>
+        </div>
+
+        <!-- 高级设置 -->
+        <div class="admin-view" data-view="advanced">
+          <section class="card">
+            <h2 data-i18n="admin.limitTitle">Max file size</h2>
+            <p class="meta" data-i18n="admin.limitDesc">The largest single file visitors can upload. Takes effect immediately; files already stored are not affected.</p>
+            <div class="limit-options" id="limitOptions" role="radiogroup">
+              <label class="limit-opt"><input type="radio" name="limit" value="500"><span>500 MB</span></label>
+              <label class="limit-opt"><input type="radio" name="limit" value="1024"><span>1 GB</span></label>
+              <label class="limit-opt"><input type="radio" name="limit" value="4096"><span>4 GB</span></label>
+              <label class="limit-opt"><input type="radio" name="limit" value="0"><span data-i18n="admin.limitNone">No limit</span></label>
+              <label class="limit-opt"><input type="radio" name="limit" value="custom"><span data-i18n="admin.limitCustom">Custom</span></label>
+            </div>
+            <div class="row limit-custom hidden" id="limitCustom">
+              <input id="limitValue" class="input" type="number" min="1" step="1" inputmode="numeric" aria-label="Size">
+              <select id="limitUnit" class="input sort-select" aria-label="Unit">
+                <option value="1">MB</option>
+                <option value="1024" selected>GB</option>
+              </select>
+            </div>
+            <div class="limit-info" id="limitInfo"></div>
+            <div class="row" style="margin-top:16px">
+              <button id="limitSave" class="primary accent" data-i18n="admin.save">Save</button>
+              <span id="limitMsg" class="meta"></span>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="setting-row">
+              <div>
+                <h2 id="evictTitle" data-i18n="admin.evictTitle">Free up space automatically</h2>
+                <p class="meta" style="margin:0" data-i18n="admin.evictDesc">When the disk doesn't have room for a file being uploaded, delete the oldest files first until there is enough space. Locked files and text shares are never deleted.</p>
+              </div>
+              <label class="switch"><input type="checkbox" id="autoEvict" role="switch" aria-labelledby="evictTitle"><span aria-hidden="true"></span></label>
+            </div>
+            <div class="limit-info" id="evictInfo"></div>
+            <div id="evictMsg" class="meta" style="margin-top:10px"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div class="chart-tip hidden" id="chartTip" role="status"></div>
+  <script src="/static/js/admin.js?v=20261022-26"></script>
+</body>
+</html>

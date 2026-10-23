@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n="index.pageTitle">ShareWeb · File Station</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261022-28">
+  <script src="/static/js/prefs.js?v=20261022-2"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo cloud"><img src="/static/favicon.svg" alt=""></div>
+        <div>
+          <h1>ShareWeb</h1>
+          <p class="muted" style="margin:0" data-i18n="brand.tagline">File Station</p>
+        </div>
+      </div>
+      <div class="prefs" data-prefs></div>
+    </header>
+
+    <section class="card">
+      <div id="dropzone" class="dropzone">
+        <div class="drop-icon">↥</div>
+        <h2 style="margin:12px 0 4px" data-i18n="index.dropTitle">Drop a file here</h2>
+        <p class="muted" data-i18n-html="index.dropHint">Or click to choose one, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste text</p>
+        <input id="fileInput" type="file" hidden>
+        <button id="pickBtn" class="primary accent narrow-btn" data-i18n="index.pick">Choose file</button>
+      </div>
+      <div class="divider" data-i18n="index.or">or</div>
+      <textarea id="pasteArea" class="textpaste" placeholder="Paste text here to share it" data-i18n-placeholder="index.pastePh"></textarea>
+      <button id="textShareBtn" class="primary narrow-btn" data-i18n="index.textBtn">Create text share</button>
+      <div id="progressWrap" class="hidden">
+        <div class="progress"><span id="progressBar"></span></div>
+        <div id="progressText" class="muted" style="margin-top:8px;font-size:13px"></div>
+      </div>
+      <div id="result" class="hidden"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between" style="margin-bottom:14px">
+        <h2 style="margin:0" data-i18n="index.redeemTitle">Retrieve a share</h2>
+        <span class="meta" data-i18n-html="index.redeemHint">Enter code <b>0000</b> for instructions</span>
+      </div>
+      <div class="code-inputs" id="codeInputs">
+        <input maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+        <input maxlength="1" inputmode="numeric">
+        <input maxlength="1" inputmode="numeric">
+        <input maxlength="1" inputmode="numeric">
+      </div>
+      <button id="redeemBtn" class="primary accent narrow-btn" data-i18n="index.redeemBtn">Retrieve</button>
+      <div id="redeemMsg" class="error"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2 style="margin:0" data-i18n="index.historyTitle">Local history</h2>
+        <div class="history-actions">
+          <button id="clearGone" class="link" data-i18n="index.clearGone" disabled>Clear unavailable</button>
+          <span class="faint" aria-hidden="true">·</span>
+          <button id="clearHistory" class="link" data-i18n="index.clear">Clear all</button>
+        </div>
+      </div>
+      <div id="history" style="margin-top:8px"></div>
+    </section>
+
+    <p class="center faint" style="font-size:12px" data-i18n="index.footer" data-i18n-args='{"days":30,"size":"1 GB"}'>Files are deleted automatically after 30 days · Max file size 1 GB</p>
+  </main>
+  <script src="/static/js/sha256.js?v=20261017-4"></script>
+  <script src="/static/js/app.js?v=20261022-25"></script>
+</body>
+</html>
