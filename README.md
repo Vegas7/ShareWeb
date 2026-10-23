@@ -74,11 +74,6 @@ SHAREWEB_BASE_DIR=$PWD SHAREWEB_ADMIN_PASSWORD=dev venv/bin/uvicorn app.main:app
 打开 http://localhost:8000 ，后台在 http://localhost:8000/admin （密码 `dev`）。
 前端改完刷新即可，没有构建步骤；改了 JS / CSS 记得把 HTML 里对应的 `?v=` 版本号加一，避免浏览器用旧缓存。
 
-## 分支
-
-- `main`：线上正在用的版本
-- `preview`：新界面风格（Liquid Glass）的试验分支
-
 ## 第三方资源
 
 - IP 地理位置：[DB-IP Lite](https://db-ip.com)（CC BY 4.0），部署时下载，不随仓库分发
