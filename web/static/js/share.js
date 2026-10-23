@@ -11,9 +11,8 @@ I18N.add({
     'share.copiedText': 'Text copied ✓',
     'share.imageTitle': 'Image share ✓',
     'share.copyImage': '📋 Copy image to clipboard',
-    'share.downloadImage': '⬇ Download image',
     'share.copiedImage': 'Image copied ✓',
-    'share.noImageClipboard': 'This browser can\'t copy images. Use "Download image", or long-press / right-click the image to copy it.',
+    'share.noImageClipboard': 'This browser can\'t copy images. Use "Download directly", or long-press / right-click the image to copy it.',
     'share.videoTitle': 'Video share ✓',
     'share.audioTitle': 'Audio share ✓',
     'share.fileTitle': 'File share ✓',
@@ -64,9 +63,8 @@ I18N.add({
     'share.copiedText': '已复制文字 ✓',
     'share.imageTitle': '图片共享 ✓',
     'share.copyImage': '📋 复制图片到剪贴板',
-    'share.downloadImage': '⬇ 下载图片',
     'share.copiedImage': '已复制图片 ✓',
-    'share.noImageClipboard': '此浏览器不支持复制图片，请用“下载图片”，或长按/右键复制。',
+    'share.noImageClipboard': '此浏览器不支持复制图片，请用“直接下载”，或长按/右键复制。',
     'share.videoTitle': '视频共享 ✓',
     'share.audioTitle': '音频共享 ✓',
     'share.fileTitle': '文件共享 ✓',
@@ -177,6 +175,63 @@ fetch('/api/share/' + encodeURIComponent(token))
   })
   .catch(() => renderExpired());
 
+// 「通过 GitHub 下载」区块: 文件页与图片页共用; 未开启镜像 (或文件太大) 时不显示
+function githubBlock(d) {
+  if (!d.github) return '';
+  return `
+      <div class="enc-box">
+        <div class="enc-head">
+          <div>
+            <h3 style="margin:0">${S('gh.title')}</h3>
+            <span class="meta">${S('gh.desc')}</span>
+          </div>
+          <span class="tag">${S('gh.tag')}</span>
+        </div>
+        <button class="primary wide" id="ghBtn">${GITHUB_ICON}<span id="ghBtnLabel" data-i18n="gh.btn">${esc(t('gh.btn'))}</span></button>
+        <div id="ghMsg" class="meta" style="margin-top:8px"></div>
+        <div id="ghLinkWrap" class="hidden" style="margin-top:8px">
+          <div id="ghRenamed" class="note hidden" style="margin:0 0 8px"></div>
+          <div class="history-url"><input class="input" id="ghLink" readonly><a class="primary" id="ghOpen" target="_blank" rel="noopener" data-i18n="gh.open">${esc(t('gh.open'))}</a></div>
+          <div class="meta" style="margin-top:6px">${S('gh.note')}</div>
+        </div>
+      </div>`;
+}
+function bindGithub(d, filename) {
+  if (!d.github) return;
+  const ghBtn = document.querySelector('#ghBtn');
+  const ghLabel = document.querySelector('#ghBtnLabel');  // 只改文字, 保留 GitHub 图标
+  ghBtn.onclick = async () => {
+    const msg = document.querySelector('#ghMsg');
+    ghBtn.disabled = true; setKey(ghLabel, 'gh.loading'); setKey(msg, null);
+    // 大文件首次获取要先传到 GitHub, 超过 3 秒提示一下。
+    const slow = setTimeout(() => setKey(ghLabel, 'gh.preparing'), 3000);
+    try {
+      const r = await fetch(`/api/share/${encodeURIComponent(token)}/github`);
+      const j = await r.json();
+      if (!r.ok || !j.url) throw new Error(j.detail || t('gh.unavailable'));
+      const wrap = document.querySelector('#ghLinkWrap');
+      document.querySelector('#ghLink').value = j.url;
+      const open = document.querySelector('#ghOpen');
+      open.href = j.url;
+      const renamed = document.querySelector('#ghRenamed');
+      if (j.filename && j.filename !== filename) {
+        setKey(renamed, 'gh.renamed', { name: j.filename, orig: filename });
+        renamed.classList.remove('hidden');
+      } else {
+        renamed.classList.add('hidden');
+      }
+      wrap.classList.remove('hidden');
+      window.open(j.url, '_blank', 'noopener');
+      clearTimeout(slow);
+      setKey(ghLabel, 'gh.done'); ghBtn.disabled = false;
+    } catch (e) {
+      clearTimeout(slow);
+      setKey(msg, 'gh.failed', { msg: e.message });
+      ghBtn.disabled = false; setKey(ghLabel, 'gh.btn');
+    }
+  };
+}
+
 function renderExpired() {
   box.className = 'center';
   box.innerHTML = `
@@ -210,18 +265,23 @@ function renderImage(d, filename, exp) {
   box.innerHTML = `
     <div class="result-box" style="margin-top:0;">
       <h2 class="result-title">${S('share.imageTitle')}</h2>
-      <p><strong style="word-break:break-all;">${esc(filename)}</strong><br><span class="meta">${fmtSize(d.size)} · ${S('share.validUntil', { d: exp })}</span></p>
-      <img src="${url}" alt="${esc(filename)}" style="max-width:100%;border-radius:12px;border:1px solid var(--card-border);display:block;margin:10px 0">
-      <div class="row" style="flex-wrap:wrap">
-        <button class="primary accent" id="copyImgBtn" data-i18n="share.copyImage">${esc(t('share.copyImage'))}</button>
-        <a class="primary button" id="dlImgBtn" href="${url}" download="${esc(filename)}" data-i18n="share.downloadImage">${esc(t('share.downloadImage'))}</a>
-      </div>
+      <p>
+        <strong style="font-size:18px;word-break:break-all;">${esc(filename)}</strong><br>
+        <span class="meta">${S('share.fileMeta', { size: fmtSize(d.size), d: exp, n: d.download_count ?? 0 })}</span>
+      </p>
+      <img src="${url}?inline=1" alt="${esc(filename)}" style="max-width:100%;border-radius:12px;border:1px solid var(--card-border);display:block;margin:10px 0">
+      ${shaBlock(d.sha256)}
+      <a class="primary accent wide button" id="dlBtn" href="${url}" download="${esc(filename)}" data-i18n="share.download">${esc(t('share.download'))}</a>
+      <button class="primary wide" id="copyImgBtn" data-i18n="share.copyImage">${esc(t('share.copyImage'))}</button>
       <div id="imgMsg" class="meta" style="margin-top:8px"></div>
+      ${githubBlock(d)}
     </div>`;
+  bindSha(d.sha256);
+  bindGithub(d, filename);
   document.querySelector('#copyImgBtn').onclick = async e => {
     const btn = e.currentTarget;
     try {
-      const blob = await (await fetch(url)).blob();
+      const blob = await (await fetch(`${url}?inline=1`)).blob();
       let out = blob;
       // clipboard 对 PNG 支持最好；非 PNG 尝试转 PNG
       if (blob.type !== 'image/png' && window.createImageBitmap && document.createElement('canvas').getContext) {
@@ -298,23 +358,7 @@ function renderFile(d, filename, exp) {
         </div>
       </div>
 
-      ${d.github ? `
-      <div class="enc-box">
-        <div class="enc-head">
-          <div>
-            <h3 style="margin:0">${S('gh.title')}</h3>
-            <span class="meta">${S('gh.desc')}</span>
-          </div>
-          <span class="tag">${S('gh.tag')}</span>
-        </div>
-        <button class="primary wide" id="ghBtn">${GITHUB_ICON}<span id="ghBtnLabel" data-i18n="gh.btn">${esc(t('gh.btn'))}</span></button>
-        <div id="ghMsg" class="meta" style="margin-top:8px"></div>
-        <div id="ghLinkWrap" class="hidden" style="margin-top:8px">
-          <div id="ghRenamed" class="note hidden" style="margin:0 0 8px"></div>
-          <div class="history-url"><input class="input" id="ghLink" readonly><a class="primary" id="ghOpen" target="_blank" rel="noopener" data-i18n="gh.open">${esc(t('gh.open'))}</a></div>
-          <div class="meta" style="margin-top:6px">${S('gh.note')}</div>
-        </div>
-      </div>` : ''}
+      ${githubBlock(d)}
     </div>`;
 
   bindSha(d.sha256);
@@ -332,40 +376,7 @@ function renderFile(d, filename, exp) {
     }, true);
   }
 
-  if (d.github) {
-    const ghBtn = document.querySelector('#ghBtn');
-    const ghLabel = document.querySelector('#ghBtnLabel');  // 只改文字, 保留 GitHub 图标
-    ghBtn.onclick = async () => {
-      const msg = document.querySelector('#ghMsg');
-      ghBtn.disabled = true; setKey(ghLabel, 'gh.loading'); setKey(msg, null);
-      // 大文件首次获取要先传到 GitHub, 超过 3 秒提示一下。
-      const slow = setTimeout(() => setKey(ghLabel, 'gh.preparing'), 3000);
-      try {
-        const r = await fetch(`/api/share/${encodeURIComponent(token)}/github`);
-        const j = await r.json();
-        if (!r.ok || !j.url) throw new Error(j.detail || t('gh.unavailable'));
-        const wrap = document.querySelector('#ghLinkWrap');
-        document.querySelector('#ghLink').value = j.url;
-        const open = document.querySelector('#ghOpen');
-        open.href = j.url;
-        const renamed = document.querySelector('#ghRenamed');
-        if (j.filename && j.filename !== filename) {
-          setKey(renamed, 'gh.renamed', { name: j.filename, orig: filename });
-          renamed.classList.remove('hidden');
-        } else {
-          renamed.classList.add('hidden');
-        }
-        wrap.classList.remove('hidden');
-        window.open(j.url, '_blank', 'noopener');
-        clearTimeout(slow);
-        setKey(ghLabel, 'gh.done'); ghBtn.disabled = false;
-      } catch (e) {
-        clearTimeout(slow);
-        setKey(msg, 'gh.failed', { msg: e.message });
-        ghBtn.disabled = false; setKey(ghLabel, 'gh.btn');
-      }
-    };
-  }
+  bindGithub(d, filename);
   document.querySelector('#copyKeyBtn').onclick = e => { copy(d.enc_key || ''); flash(e.currentTarget, 'common.copied', 'enc.copyKey'); };
 
   document.querySelector('#encTextBtn').onclick = async () => {
