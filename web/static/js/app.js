@@ -35,7 +35,34 @@ $('#progressBar').style.width='0%';setKey($('#progressText'),'upload.uploading')
 
 const codeInputs=[...document.querySelectorAll('#codeInputs input')];
 function redeemCode(){const code=codeInputs.map(x=>x.value).join('');if(!/^\d{4}$/.test(code)){setKey($('#redeemMsg'),'redeem.need4');return}setKey($('#redeemMsg'),null);fetch('/api/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}).then(async r=>{const d=await r.json();if(r.status===429){setKey($('#redeemMsg'),'redeem.cooldown',{t:{date:d.cooldown_until}});return}if(r.status===403){setKey($('#redeemMsg'),'redeem.blacklisted');return}if(!r.ok){setKey($('#redeemMsg'),'redeem.wrong',{n:d.fail_count||1});return}if(d.special){location.href='/special';return}location.href=d.url}).catch(()=>{setKey($('#redeemMsg'),'net.error')})}
-codeInputs.forEach((el,i)=>{el.addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(-1);if(e.target.value&&codeInputs[i+1])codeInputs[i+1].focus()});el.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!e.target.value&&codeInputs[i-1]){codeInputs[i-1].value='';codeInputs[i-1].focus()}if(e.key==='Enter'&&i===codeInputs.length-1)redeemCode()});el.addEventListener('paste',e=>{e.preventDefault();const t=(e.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,4);t.split('').forEach((c,j)=>{if(codeInputs[j])codeInputs[j].value=c});if(t&&codeInputs[Math.min(t.length-1,3)])codeInputs[Math.min(t.length-1,3)].focus();if(t.length===4)redeemCode()});});
+// 提取码四个格子: 点击或切换到任意一格都会选中其中的数字, 直接输入即替换这一位并跳到下一格
+// (每格 maxlength=1, 不选中的话已有数字的格子输入不进去)
+const lastBox=codeInputs.length-1;
+function focusBox(i){const el=codeInputs[i];if(el){el.focus();el.select()}}
+codeInputs.forEach((el,i)=>{
+  const selectAll=()=>el.select();
+  el.addEventListener('focus',selectAll);el.addEventListener('click',selectAll);
+  el.addEventListener('keydown',e=>{
+    const plain=!e.ctrlKey&&!e.metaKey&&!e.altKey;
+    if(/^\d$/.test(e.key)&&plain){e.preventDefault();el.value=e.key;focusBox(Math.min(i+1,lastBox));return}
+    if(e.key.length===1&&plain){e.preventDefault();return}  // 字母等其他字符不接受, 也不会把选中的数字删掉
+    if(e.key==='Backspace'&&!el.value&&i>0){e.preventDefault();codeInputs[i-1].value='';focusBox(i-1);return}
+    if(e.key==='ArrowLeft'&&i>0){e.preventDefault();focusBox(i-1)}
+    else if(e.key==='ArrowRight'&&i<lastBox){e.preventDefault();focusBox(i+1)}
+    else if(e.key==='Enter'&&i===lastBox)redeemCode();
+  });
+  // 手机输入法常常拿不到按键 (keydown 里是 Unidentified), 走 input 事件: 只留下刚输入的那个数字;
+  // 输入的不是数字时恢复原来的数字, 删除操作则照常清空
+  let before='';
+  el.addEventListener('beforeinput',()=>{before=el.value});
+  el.addEventListener('input',e=>{
+    if((e.inputType||'').startsWith('delete')){el.value='';return}
+    const d=((e.data||el.value).match(/\d/g)||[]).pop();
+    if(!d){el.value=before;el.select();return}
+    el.value=d;focusBox(Math.min(i+1,lastBox));
+  });
+  el.addEventListener('paste',e=>{e.preventDefault();const t=(e.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,4);t.split('').forEach((c,j)=>{if(codeInputs[j])codeInputs[j].value=c});if(t)focusBox(Math.min(t.length,lastBox));if(t.length===4)redeemCode()});
+});
 $('#redeemBtn').onclick=redeemCode;
 pick.onclick=()=>input.click();input.onchange=()=>upload(input.files[0]);drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');upload(e.dataTransfer.files[0])};document.addEventListener('paste',onPaste);textBtn.onclick=async()=>{const text=paste.value;if(!text.trim())return;const res=await fetch('/api/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const data=await res.json();if(!res.ok){alert(data.detail||t('text.failed'));return}data.type='text';await showResult(data);paste.value=''};// 清除按钮两步确认: 第一次点击变成高亮的「确认」, 再点才执行; 点击其他地方 / Esc / 焦点移走 / 3 秒无操作即取消 (鼠标停在按钮上时暂停计时)。
 let armedBtn=null,armTimer=0;const ARM_TIMEOUT=3000;
