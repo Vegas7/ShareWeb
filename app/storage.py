@@ -41,7 +41,7 @@ def _decode_header(value: bytes) -> str:
         return value.decode("latin-1")
 
 
-def _write_chunk(out, sha, data: bytes):
+def write_chunk(out, sha, data: bytes):
     sha.update(data)
     out.write(data)
 
@@ -146,7 +146,7 @@ async def save_upload_stream(request, stored_name: str, field_name: str = "file"
             if not (on_disk_full and await run_in_threadpool(on_disk_full, need)):
                 raise DiskFull("not enough disk space")
         # 写盘 / 算哈希放到线程池, 不阻塞事件循环。
-        await run_in_threadpool(_write_chunk, out, sha, data)
+        await run_in_threadpool(write_chunk, out, sha, data)
 
     try:
         async for chunk in request.stream():

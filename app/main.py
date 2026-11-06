@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, FastAPI, Form, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -30,6 +30,7 @@ from . import crypto
 from . import github_mirror
 from . import geoip, visitors
 from . import app_settings
+from . import resumable
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ async def cleanup_loop():
         except Exception:
             logger.exception("visitor prune failed")
         try:
-            stale = await run_in_threadpool(cleanup_stale_uploads)
+            stale = await run_in_threadpool(cleanup_stale_uploads) + await run_in_threadpool(resumable.cleanup_stale)
             if stale:
                 logger.info("removed %d stale partial uploads", stale)
         except Exception:
@@ -114,6 +115,13 @@ class RedeemRequest(BaseModel):
 class ShareStatusRequest(BaseModel):
     tokens: list[str] = Field(max_length=200)
 
+class UploadInitRequest(BaseModel):
+    sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    size: int = Field(ge=0)
+    filename: str = Field(default="", max_length=4096)
+    content_type: Optional[str] = Field(default=None, max_length=200)
+    upload_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+
 class TextShareRequest(BaseModel):
     text: str = Field(min_length=1)
 
@@ -171,47 +179,97 @@ async def share_status_api(request: Request, payload: ShareStatusRequest):
     tokens = [t for t in payload.tokens if isinstance(t, str) and 0 < len(t) <= 64]
     return {"status": await run_in_threadpool(share_status, tokens)}
 
-@app.post("/api/check-hash")
-async def check_hash(request: Request, sha256: str = Form(...)):
-    ensure_not_blacklisted(request)
-    normalized = sha256.strip().lower()
-    if len(normalized) != 64 or any(c not in "0123456789abcdef" for c in normalized):
-        raise HTTPException(400, "invalid sha256")
-    row = get_active_file_by_sha256(normalized)
-    if not row:
-        return {"exists": False}
-    return {
-        "exists": True,
-        "token": row["token"],
-        "code": row["code"],
-        "filename": row["original_name"],
-        "size": row["size"],
-        "sha256": row["sha256"],
-        "expires_at": None if row["locked"] else row["expires_at"],
-        "url": f"{settings.public_base_url}/share/{row['token']}",
-    }
+def _share_payload(row) -> dict:
+    return {"token": row["token"], "code": row["code"], "filename": row["original_name"], "size": row["size"],
+            "sha256": row["sha256"], "expires_at": None if row["locked"] else row["expires_at"],
+            "url": f"{settings.public_base_url}/share/{row['token']}"}
+
+async def _ensure_space(need: int, ip: str):
+    """磁盘放不下 need 字节时 (开启「自动清理」则先删最旧的文件腾空间) 返回 507。"""
+    if need > app_settings.upload_capacity_bytes():
+        if not (settings.auto_evict and await run_in_threadpool(evict_for_space, need, app_settings.upload_capacity_bytes, ip)):
+            raise HTTPException(507, "not enough disk space on server")
+
+def _disk_full_handler(ip: str):
+    return (lambda need: evict_for_space(need, app_settings.upload_capacity_bytes, ip)) if settings.auto_evict else None
+
+def _create_file_share(request, background, filename, content_type, size, sha, stored_name, rel_path, ip) -> dict:
+    # 浏览器对 .mov 等常报空/通用 MIME，按扩展名补正，保证前端能识别为视频。
+    mime = content_type or ""
+    if not mime or mime == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(filename or "")
+        mime = guessed or "application/octet-stream"
+    filename = filename or "download.bin"
+    share_id, token, code, expires_at = create_share_file(
+        filename, mime, size, sha, stored_name, rel_path, ip, request.headers.get("user-agent","-"))
+    if github_mirror.enabled() and github_mirror.fits(size):
+        # 后台镜像到 GitHub 私仓，不阻塞上传响应。
+        background.add_task(mirror_to_github, share_id)
+    return {"ok": True, "id": share_id, "token": token, "code": code, "filename": filename, "size": size, "sha256": sha, "expires_at": expires_at, "url": f"{settings.public_base_url}/share/{token}"}
+
+@app.post("/api/upload/init")
+async def upload_init(request: Request, payload: UploadInitRequest):
+    """断点续传第一步: 服务器已有相同文件时直接返回它; 否则返回会话 id 和已收到的字节数 (见 resumable.py)。"""
+    ip = ensure_not_blacklisted(request)
+    sha = payload.sha256.lower()
+    row = await run_in_threadpool(get_active_file_by_sha256, sha)
+    if row:
+        return {"exists": True, **_share_payload(row)}
+    limit = settings.max_upload_bytes
+    if limit is not None and payload.size > limit:
+        raise HTTPException(413, "file too large")
+    upload_id, offset = await run_in_threadpool(
+        resumable.open_session, sha, payload.size, payload.filename or None, payload.content_type, ip, payload.upload_id)
+    await _ensure_space(payload.size - offset, ip)
+    if offset:
+        log_event(ip, "UPLOAD_RESUME", "SUCCESS", detail=f"ID={upload_id} OFFSET={offset} SIZE={payload.size} SHA256={sha}")
+    return {"exists": False, "upload_id": upload_id, "offset": offset, "max_chunk": resumable.MAX_CHUNK_BYTES}
+
+@app.put("/api/upload/{upload_id}")
+async def upload_chunk(upload_id: str, offset: int, request: Request, background: BackgroundTasks):
+    """断点续传第二步: 请求体是文件从 offset 开始的一段; 收齐后自动校验 SHA-256 并生成分享。"""
+    ip = ensure_not_blacklisted(request)
+    if len(upload_id) != 32 or any(c not in "0123456789abcdef" for c in upload_id):
+        raise HTTPException(404, "upload not found")
+    try:
+        row, received, done = await resumable.receive_chunk(upload_id, offset, request.stream(), _disk_full_handler(ip))
+    except resumable.UploadNotFound:
+        raise HTTPException(404, "upload not found")
+    except resumable.OffsetMismatch as exc:
+        return JSONResponse({"detail": "offset mismatch", "offset": exc.offset}, status_code=409)
+    except resumable.ChecksumMismatch:
+        log_event(ip, "UPLOAD", "CHECKSUM_MISMATCH", detail=f"ID={upload_id}", level=logging.WARNING)
+        raise HTTPException(422, "checksum mismatch")
+    except UploadTooLarge:
+        raise HTTPException(413, "chunk too large")
+    except DiskFull:
+        logger.warning("upload aborted: disk almost full ip=%s", ip)
+        raise HTTPException(507, "not enough disk space on server")
+    except ClientDisconnect:
+        logger.info("upload chunk aborted by client ip=%s id=%s offset=%d", ip, upload_id, offset)
+        return Response(status_code=400)
+    if not done:
+        return {"done": False, "offset": received}
+    stored_name, rel_path = done
+    return {"done": True, **_create_file_share(request, background, row["filename"], row["content_type"],
+                                               received, row["sha256"], stored_name, rel_path, ip)}
 
 @app.post("/api/upload")
 async def upload_file(request: Request, background: BackgroundTasks):
+    """一次性上传 (multipart); 网页正常走上面的断点续传, 这里是算不出 SHA-256 时的后备。"""
     ip = ensure_not_blacklisted(request)
-    if request.headers.get("content-length"):
-        try:
-            length = int(request.headers["content-length"])
-        except ValueError:
-            length = None
-        if length is not None:
-            limit = settings.max_upload_bytes
-            if limit is not None and length > limit + 4*1024*1024:
-                raise HTTPException(413, "file too large")
-            if length > app_settings.upload_capacity_bytes():
-                # 开启「自动清理」时先删最旧的文件腾空间, 腾不出来才拒绝
-                if not (settings.auto_evict and await run_in_threadpool(evict_for_space, length, app_settings.upload_capacity_bytes, ip)):
-                    raise HTTPException(507, "not enough disk space on server")
+    try:
+        length = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        length = 0
+    limit = settings.max_upload_bytes
+    if limit is not None and length > limit + 4*1024*1024:
+        raise HTTPException(413, "file too large")
+    await _ensure_space(length, ip)
     stored_name = secrets.token_hex(16) + ".share"
     try:
         # 流式写入 data 目录, 不经过 /tmp; 失败/断开时半成品会被删除。
-        on_full = (lambda need: evict_for_space(need, app_settings.upload_capacity_bytes, ip)) if settings.auto_evict else None
-        rel_path, size, sha, filename, content_type = await save_upload_stream(request, stored_name, on_disk_full=on_full)
+        rel_path, size, sha, filename, content_type = await save_upload_stream(request, stored_name, on_disk_full=_disk_full_handler(ip))
     except UploadTooLarge:
         raise HTTPException(413, "file too large")
     except DiskFull:
@@ -225,17 +283,7 @@ async def upload_file(request: Request, background: BackgroundTasks):
     except Exception:
         logger.exception("upload save failed")
         raise HTTPException(500, "upload failed")
-    # 浏览器对 .mov 等常报空/通用 MIME，按扩展名补正，保证前端能识别为视频。
-    mime = content_type or ""
-    if not mime or mime == "application/octet-stream":
-        guessed, _ = mimetypes.guess_type(filename or "")
-        mime = guessed or "application/octet-stream"
-    share_id, token, code, expires_at = create_share_file(
-        filename or "download.bin", mime, size, sha, stored_name, rel_path, ip, request.headers.get("user-agent","-"))
-    if github_mirror.enabled() and github_mirror.fits(size):
-        # 后台镜像到 GitHub 私仓，不阻塞上传响应。
-        background.add_task(mirror_to_github, share_id)
-    return {"ok": True, "id": share_id, "token": token, "code": code, "filename": filename or "download.bin", "size": size, "sha256": sha, "expires_at": expires_at, "url": f"{settings.public_base_url}/share/{token}"}
+    return _create_file_share(request, background, filename, content_type, size, sha, stored_name, rel_path, ip)
 
 @app.post("/api/text")
 async def upload_text(request: Request, payload: TextShareRequest):

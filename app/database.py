@@ -74,6 +74,17 @@ CREATE TABLE IF NOT EXISTS app_settings (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+-- 断点续传中尚未完成的上传 (见 resumable.py); 已收到的数据在 data/<前两位>/.part-<id>
+CREATE TABLE IF NOT EXISTS uploads (
+    id TEXT PRIMARY KEY,
+    sha256 TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    filename TEXT,
+    content_type TEXT,
+    ip TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_shares_code_active ON shares(code, active, expires_at);
 CREATE INDEX IF NOT EXISTS idx_shares_expires ON shares(expires_at);
 CREATE INDEX IF NOT EXISTS idx_visitors_last_seen ON visitors(last_seen);
