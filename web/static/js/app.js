@@ -19,26 +19,31 @@ function updateHistoryButtons(){const g=$('#clearGone');g.disabled=historyGone.s
 const historyBox=$('#history');
 function updateHistoryFade(){const h=historyBox;h.classList.toggle('more-above',h.scrollTop>1);h.classList.toggle('more-below',h.scrollTop+h.clientHeight<h.scrollHeight-1)}
 historyBox.addEventListener('scroll',updateHistoryFade,{passive:true});
-// 列表高度: 尽量让整页一屏显示完。屏幕够宽但不够高 (笔记本、1080p) 时左右两栏, 列表与左边卡片底部对齐;
-// 否则上下排列, 列表占满屏幕剩下的高度。两种情况都至少留约两条记录的高度。
-// 屏幕高度取 100svh (手机地址栏收起/展开时不变, 列表不会跟着忽高忽低); 超宽屏整页放大 (app.css 里的 zoom) 时按放大后的尺寸算
-const HISTORY_MIN=110,TWO_COL_MIN_W=860,TWO_COL_MAX_H=1100,svhProbe=document.createElement('div');
+// 列表高度: 尽量让整页一屏显示完。默认上下排列, 列表占满屏幕剩下的高度; 屏幕够宽、但上下排列时列表连约三条记录
+// 都放不下 (约 240px, 如笔记本、1080p 显示器) 才改成左右两栏, 列表与左边卡片底部对齐。
+// 是否两栏每次都按上下排列实际量一遍再决定 (同一次脚本执行内完成, 不会闪); 屏幕高度取 100svh (手机地址栏收起/展开时不变);
+// 超宽屏整页放大 (app.css 里的 zoom) 时量到的是放大后的像素, 换算回 CSS 像素
+const HISTORY_MIN=110,SINGLE_COL_MIN=240,TWO_COL_MIN_W=860,svhProbe=document.createElement('div');
 svhProbe.style.cssText='position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none';document.body.appendChild(svhProbe);
 function fitHistory(){
   const z=parseFloat(getComputedStyle(document.documentElement).zoom)||1;
   const viewH=Math.min(svhProbe.getBoundingClientRect().height||innerHeight,innerHeight);
-  const grid=$('.home-grid'),twoCol=innerWidth/z>=TWO_COL_MIN_W&&viewH/z<TWO_COL_MAX_H;
-  grid.classList.toggle('two-col',twoCol);
-  const h=historyBox,cs=getComputedStyle(h.closest('.card')),ms=getComputedStyle($('main.container')),box=h.getBoundingClientRect();
-  let avail;
-  if(twoCol)avail=$('#mainCard').getBoundingClientRect().bottom-box.top-(parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth))*z;
-  else avail=viewH-($('main.container').getBoundingClientRect().height+(parseFloat(ms.marginTop)+parseFloat(ms.marginBottom))*z-box.height);
+  const grid=$('.home-grid'),h=historyBox,main=$('main.container');
+  grid.classList.remove('two-col');
+  const ms=getComputedStyle(main);
+  let avail=viewH-(main.getBoundingClientRect().height+(parseFloat(ms.marginTop)+parseFloat(ms.marginBottom))*z-h.getBoundingClientRect().height);
+  if(innerWidth/z>=TWO_COL_MIN_W&&avail/z<SINGLE_COL_MIN){
+    grid.classList.add('two-col');
+    const cs=getComputedStyle(h.closest('.card'));
+    avail=$('#mainCard').getBoundingClientRect().bottom-h.getBoundingClientRect().top-(parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth))*z;
+  }
   h.style.maxHeight=Math.max(HISTORY_MIN,Math.floor(avail/z))+'px';
   updateHistoryFade();
 }
 addEventListener('resize',fitHistory);
 // 上传进度 / 结果出现等让左边卡片变高时也重新算
-if(window.ResizeObserver)new ResizeObserver(()=>fitHistory()).observe($('#mainCard'));
+// (下一帧再算: fitHistory 自己会临时改变卡片大小, 在回调里直接算会触发 ResizeObserver 的循环警告)
+if(window.ResizeObserver)new ResizeObserver(()=>requestAnimationFrame(fitHistory)).observe($('#mainCard'));
 fitHistory();  // 首次绘制前就定好一栏还是两栏, 避免闪一下
 document.fonts?.ready.then(fitHistory);
 async function renderHistory(){const box=$('#history');const items=await getHistory();historyGone=new Map();historyCount=items.length;updateHistoryButtons();if(!items.length){box.innerHTML=`<p class="muted">${S('history.empty')}</p>`;fitHistory();return}box.innerHTML=items.map(x=>{

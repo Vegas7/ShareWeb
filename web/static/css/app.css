@@ -473,8 +473,8 @@ html.admin-page{scrollbar-gutter:stable}
 .home-grid.two-col{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start;margin-bottom:18px}
 .home-grid.two-col > .card{margin-bottom:0}
 .home-grid.two-col > .history-card{align-self:stretch}
-/* 屏幕较矮 (笔记本、手机): 收紧上下留白 */
-@media (max-height:820px){
+/* 屏幕不算高 (笔记本、1080p、4K 175% 缩放、手机): 收紧上下留白, 给本地历史多留些高度 */
+@media (max-height:1100px){
   .home .container{margin-bottom:16px}
   .home header{margin-bottom:14px}
   .mode-switch{margin-bottom:14px}
@@ -484,7 +484,7 @@ html.admin-page{scrollbar-gutter:stable}
   .mode-panel .narrow-btn{margin-top:12px}
   .redeem-title{margin-bottom:14px}
 }
-@media (max-height:820px) and (min-width:701px){.home .container{margin-top:20px}}
+@media (max-height:1100px) and (min-width:701px){.home .container{margin-top:20px}}
 /* 较矮的手机: 上传区再紧凑些 (去掉一行说明文字, 文字框更矮) */
 @media (max-height:820px) and (hover:none) and (pointer:coarse){
   .drop-hint-touch{display:none}
