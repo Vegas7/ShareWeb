@@ -160,8 +160,13 @@ function setMode(mode,{focus=false}={}){
   // 切到下载时把光标放进第一个空格子 (只在电脑上; 手机上自动弹出键盘反而打扰)
   if(focus&&mode==='download'&&matchMedia('(hover: hover) and (pointer: fine)').matches)focusBox(Math.max(0,codeInputs.findIndex(x=>!x.value)))
 }
+// 点开关上任何位置 (两个按钮或边缘) 都切到另一边
+$('#modeSwitch').onclick=()=>{
+  const next=$('#modeSwitch').dataset.mode==='upload'?'download':'upload';
+  setMode(next,{focus:true});
+  if(modeTabs.includes(document.activeElement))modeTabs.find(b=>b.dataset.mode===next).focus();
+};
 modeTabs.forEach(b=>{
-  b.onclick=()=>setMode(b.dataset.mode,{focus:true});
   b.onkeydown=e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();const next=modeTabs[e.key==='ArrowRight'?1:0];setMode(next.dataset.mode);next.focus()};
 });
 setMode((()=>{try{return localStorage.getItem('shareweb.mode')}catch(e){return null}})()==='download'?'download':'upload');

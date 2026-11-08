@@ -105,9 +105,9 @@ header.topbar{margin-bottom:20px}
 .drop-title{margin:0 0 4px}
 .drop-hint-touch{display:none}
 /* 首页: 上传 / 下载切换。滑块与两个面板一起滑动; 两个面板叠在同一个网格单元里, 高度总是一致 */
-.mode-switch{position:relative;display:grid;grid-template-columns:1fr 1fr;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:0 auto 20px;padding:4px;border-radius:999px;background:color-mix(in srgb,var(--muted) 15%,transparent)}
+.mode-switch{position:relative;display:grid;grid-template-columns:1fr 1fr;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:0 auto 20px;padding:4px;border-radius:999px;background:color-mix(in srgb,var(--muted) 15%,transparent);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
 .mode-switch button{position:relative;z-index:1;border:0;background:none;padding:9px 0;border-radius:999px;font-weight:600;color:var(--muted);cursor:pointer;transition:color .3s ease}
-.mode-switch button:hover{color:var(--text)}
+.mode-switch:hover button{color:var(--text)}
 .mode-switch button[aria-selected="true"]{color:var(--text)}
 .mode-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .mode-thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--switch-thumb);box-shadow:0 1px 2px rgba(0,0,0,.08),0 3px 10px rgba(20,30,55,.12);transition:transform .42s cubic-bezier(.34,1.32,.52,1)}
