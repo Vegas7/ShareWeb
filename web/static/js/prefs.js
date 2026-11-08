@@ -20,9 +20,12 @@
   if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
   root.lang = lang === 'zh' ? 'zh-CN' : 'en';
 
+  // 时间统一用 24 小时制 (英文默认是 12 小时制 AM/PM, 与中文不一致)
+  const H24 = { hourCycle: 'h23' };
+  const fmtDate = d => new Date(d).toLocaleString(locale(), H24);
   function fmtArg(v) {
     if (v && typeof v === 'object') {
-      if ('date' in v) return v.date ? new Date(v.date).toLocaleString(locale()) : t('common.forever');
+      if ('date' in v) return v.date ? fmtDate(v.date) : t('common.forever');
       if ('key' in v) return t(v.key);
     }
     return v;
@@ -160,8 +163,8 @@
     t, add, apply, setLang, span, htmlSpan, dateSpan, setKey,
     get lang() { return lang; },
     get locale() { return locale(); },
-    date(d) { return new Date(d).toLocaleString(locale()); },
-    time(d) { return new Date(d).toLocaleTimeString(locale()); },
+    date: fmtDate,
+    time(d) { return new Date(d).toLocaleTimeString(locale(), H24); },
   };
 })();
 
