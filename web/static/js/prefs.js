@@ -87,16 +87,12 @@
     side: svg('<rect x="3.5" y="3.5" width="10" height="17" rx="1.5"/><rect x="16" y="3.5" width="4.5" height="17" rx="1.5"/>'),
   };
   const LAYOUT_KEY = { auto: 'prefs.layoutAuto', stack: 'prefs.layoutStack', side: 'prefs.layoutSide' };
-  const CHECK = '<svg class="pref-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
   function renderToggles() {
     document.querySelectorAll('[data-prefs]').forEach(slot => {
       if (!slot.querySelector('[data-pref="lang"]')) {
         slot.innerHTML = ('prefsLayout' in slot.dataset
-          ? '<div class="pref-menu-wrap"><button type="button" class="pref-btn" data-pref="layout" aria-haspopup="menu" aria-expanded="false"></button>'
-            + '<div class="pref-menu" role="menu" hidden>'
-            + LAYOUTS.map(l => '<button type="button" role="menuitemradio" data-layout="' + l + '" tabindex="-1">' + LAYOUT_ICON[l] + '<span></span>' + CHECK + '</button>').join('')
-            + '</div></div>'
+          ? '<button type="button" class="pref-btn pref-layout" data-pref="layout"></button>'
           : '')
           + '<button type="button" class="pref-btn" data-pref="lang">' + TRANSLATE + '</button>'
           + '<button type="button" class="pref-btn" data-pref="theme"></button>';
@@ -106,11 +102,6 @@
         yb.innerHTML = LAYOUT_ICON[layout];
         yb.title = t('prefs.layoutTitle', { mode: { key: LAYOUT_KEY[layout] } });
         yb.setAttribute('aria-label', yb.title);
-        slot.querySelector('.pref-menu').setAttribute('aria-label', t('prefs.layout'));
-        slot.querySelectorAll('[data-layout]').forEach(it => {
-          it.querySelector('span').textContent = t(LAYOUT_KEY[it.dataset.layout]);
-          it.setAttribute('aria-checked', it.dataset.layout === layout);
-        });
       }
       const lb = slot.querySelector('[data-pref="lang"]');
       lb.title = t('prefs.lang');
@@ -155,48 +146,13 @@
     document.dispatchEvent(new CustomEvent('layoutchange', { detail: { layout } }));
   }
 
-  // 排版菜单: 点按钮展开, 点选项 / 菜单外 / Esc 收起; 上下方向键在选项间移动
-  function openMenu(btn, open, focusItem) {
-    const menu = btn.nextElementSibling;
-    menu.hidden = !open;
-    btn.setAttribute('aria-expanded', open);
-    if (open && focusItem) (menu.querySelector('[aria-checked="true"]') || menu.firstElementChild).focus();
-  }
-  function closeMenus(except) {
-    document.querySelectorAll('[data-pref="layout"][aria-expanded="true"]').forEach(b => { if (b !== except) openMenu(b, false); });
-  }
-
+  // 排版按钮与语言 / 主题按钮一样, 点一下切到下一种: 自适应 → 竖向 → 横向 → 自适应
   document.addEventListener('click', e => {
-    const item = e.target.closest('.pref-menu [data-layout]');
-    if (item) {
-      const btn = item.closest('.pref-menu-wrap').querySelector('[data-pref]');
-      setLayout(item.dataset.layout);
-      openMenu(btn, false);
-      if (e.detail === 0) btn.focus();  // 键盘选择后焦点回到按钮
-      return;
-    }
     const btn = e.target.closest('[data-pref]');
-    closeMenus(btn);
     if (!btn) return;
-    if (btn.dataset.pref === 'layout') openMenu(btn, btn.getAttribute('aria-expanded') !== 'true', e.detail === 0);
+    if (btn.dataset.pref === 'layout') setLayout(LAYOUTS[(LAYOUTS.indexOf(layout) + 1) % LAYOUTS.length]);
     else if (btn.dataset.pref === 'lang') setLang(lang === 'en' ? 'zh' : 'en');
     else toggleTheme();
-  });
-  document.addEventListener('keydown', e => {
-    const wrap = e.target.closest?.('.pref-menu-wrap');
-    if (!wrap) return;
-    const btn = wrap.querySelector('[data-pref]'), items = [...wrap.querySelectorAll('[data-layout]')];
-    if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { e.preventDefault(); openMenu(btn, false); btn.focus(); return; }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    e.preventDefault();
-    if (e.target === btn) { openMenu(btn, true, true); return; }
-    const i = items.indexOf(e.target);
-    if (i >= 0) items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
-  });
-  // 焦点移出菜单 (Tab 走开) 时收起
-  document.addEventListener('focusout', e => {
-    const wrap = e.target.closest?.('.pref-menu-wrap');
-    if (wrap && e.relatedTarget && !wrap.contains(e.relatedTarget)) openMenu(wrap.querySelector('[data-pref]'), false);
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', renderToggles);
   document.addEventListener('DOMContentLoaded', apply);
@@ -207,11 +163,10 @@
       'prefs.lang': 'Switch to Chinese',
       'prefs.toLight': 'Switch to light theme',
       'prefs.toDark': 'Switch to dark theme',
-      'prefs.layout': 'Layout',
       'prefs.layoutTitle': 'Layout: {mode}',
       'prefs.layoutAuto': 'Auto',
-      'prefs.layoutStack': 'Stacked',
-      'prefs.layoutSide': 'Side by side',
+      'prefs.layoutStack': 'Vertical',
+      'prefs.layoutSide': 'Horizontal',
       'common.loading': 'Loading…',
       'common.copied': 'Copied ✓',
       'common.home': 'Back to home',
@@ -227,7 +182,6 @@
       'prefs.lang': '切换到英文',
       'prefs.toLight': '切换到亮色主题',
       'prefs.toDark': '切换到暗色主题',
-      'prefs.layout': '排版',
       'prefs.layoutTitle': '排版：{mode}',
       'prefs.layoutAuto': '自适应',
       'prefs.layoutStack': '竖向',
