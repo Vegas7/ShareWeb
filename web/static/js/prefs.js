@@ -19,6 +19,10 @@
   const savedTheme = store.get('sw-theme');
   if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
   root.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  // 首页排版: auto 自适应 / stack 竖向 (上下) / side 横向 (左右)。由首页脚本按 <html data-layout> 排版
+  const LAYOUTS = ['auto', 'stack', 'side'];
+  let layout = LAYOUTS.includes(store.get('sw-layout')) ? store.get('sw-layout') : 'auto';
+  root.dataset.layout = layout;
 
   // 时间统一用 24 小时制 (英文默认是 12 小时制 AM/PM, 与中文不一致)
   const H24 = { hourCycle: 'h23' };
@@ -75,11 +79,38 @@
   // 「文A」翻译图标 (Material Icons "translate")。图标不随语言变化, 目标语言写在 title / aria-label 里。
   const TRANSLATE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>';
 
+  // 排版图标: 大块是上传/下载卡片, 小块是本地历史
+  const svg = body => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>';
+  const LAYOUT_ICON = {
+    auto: svg('<rect x="3.5" y="3.5" width="10" height="10" rx="1.5"/><rect x="16" y="3.5" width="4.5" height="10" rx="1.5"/><rect x="3.5" y="16" width="17" height="4.5" rx="1.5"/>'),
+    stack: svg('<rect x="3.5" y="3.5" width="17" height="10" rx="1.5"/><rect x="3.5" y="16" width="17" height="4.5" rx="1.5"/>'),
+    side: svg('<rect x="3.5" y="3.5" width="10" height="17" rx="1.5"/><rect x="16" y="3.5" width="4.5" height="17" rx="1.5"/>'),
+  };
+  const LAYOUT_KEY = { auto: 'prefs.layoutAuto', stack: 'prefs.layoutStack', side: 'prefs.layoutSide' };
+  const CHECK = '<svg class="pref-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
   function renderToggles() {
     document.querySelectorAll('[data-prefs]').forEach(slot => {
-      if (!slot.firstChild) {
-        slot.innerHTML = '<button type="button" class="pref-btn" data-pref="lang">' + TRANSLATE + '</button>'
+      if (!slot.querySelector('[data-pref="lang"]')) {
+        slot.innerHTML = ('prefsLayout' in slot.dataset
+          ? '<div class="pref-menu-wrap"><button type="button" class="pref-btn" data-pref="layout" aria-haspopup="menu" aria-expanded="false"></button>'
+            + '<div class="pref-menu" role="menu" hidden>'
+            + LAYOUTS.map(l => '<button type="button" role="menuitemradio" data-layout="' + l + '" tabindex="-1">' + LAYOUT_ICON[l] + '<span></span>' + CHECK + '</button>').join('')
+            + '</div></div>'
+          : '')
+          + '<button type="button" class="pref-btn" data-pref="lang">' + TRANSLATE + '</button>'
           + '<button type="button" class="pref-btn" data-pref="theme"></button>';
+      }
+      const yb = slot.querySelector('[data-pref="layout"]');
+      if (yb) {
+        yb.innerHTML = LAYOUT_ICON[layout];
+        yb.title = t('prefs.layoutTitle', { mode: { key: LAYOUT_KEY[layout] } });
+        yb.setAttribute('aria-label', yb.title);
+        slot.querySelector('.pref-menu').setAttribute('aria-label', t('prefs.layout'));
+        slot.querySelectorAll('[data-layout]').forEach(it => {
+          it.querySelector('span').textContent = t(LAYOUT_KEY[it.dataset.layout]);
+          it.setAttribute('aria-checked', it.dataset.layout === layout);
+        });
       }
       const lb = slot.querySelector('[data-pref="lang"]');
       lb.title = t('prefs.lang');
@@ -116,11 +147,56 @@
     renderToggles();
   }
 
+  function setLayout(l) {
+    layout = l;
+    root.dataset.layout = l;
+    store.set('sw-layout', l);
+    renderToggles();
+    document.dispatchEvent(new CustomEvent('layoutchange', { detail: { layout } }));
+  }
+
+  // 排版菜单: 点按钮展开, 点选项 / 菜单外 / Esc 收起; 上下方向键在选项间移动
+  function openMenu(btn, open, focusItem) {
+    const menu = btn.nextElementSibling;
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', open);
+    if (open && focusItem) (menu.querySelector('[aria-checked="true"]') || menu.firstElementChild).focus();
+  }
+  function closeMenus(except) {
+    document.querySelectorAll('[data-pref="layout"][aria-expanded="true"]').forEach(b => { if (b !== except) openMenu(b, false); });
+  }
+
   document.addEventListener('click', e => {
+    const item = e.target.closest('.pref-menu [data-layout]');
+    if (item) {
+      const btn = item.closest('.pref-menu-wrap').querySelector('[data-pref]');
+      setLayout(item.dataset.layout);
+      openMenu(btn, false);
+      if (e.detail === 0) btn.focus();  // 键盘选择后焦点回到按钮
+      return;
+    }
     const btn = e.target.closest('[data-pref]');
+    closeMenus(btn);
     if (!btn) return;
-    if (btn.dataset.pref === 'lang') setLang(lang === 'en' ? 'zh' : 'en');
+    if (btn.dataset.pref === 'layout') openMenu(btn, btn.getAttribute('aria-expanded') !== 'true', e.detail === 0);
+    else if (btn.dataset.pref === 'lang') setLang(lang === 'en' ? 'zh' : 'en');
     else toggleTheme();
+  });
+  document.addEventListener('keydown', e => {
+    const wrap = e.target.closest?.('.pref-menu-wrap');
+    if (!wrap) return;
+    const btn = wrap.querySelector('[data-pref]'), items = [...wrap.querySelectorAll('[data-layout]')];
+    if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { e.preventDefault(); openMenu(btn, false); btn.focus(); return; }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    if (e.target === btn) { openMenu(btn, true, true); return; }
+    const i = items.indexOf(e.target);
+    if (i >= 0) items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+  });
+  // 焦点移出菜单 (Tab 走开) 时收起
+  document.addEventListener('focusout', e => {
+    const wrap = e.target.closest?.('.pref-menu-wrap');
+    if (wrap && e.relatedTarget && !wrap.contains(e.relatedTarget)) openMenu(wrap.querySelector('[data-pref]'), false);
   });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', renderToggles);
   document.addEventListener('DOMContentLoaded', apply);
@@ -131,6 +207,11 @@
       'prefs.lang': 'Switch to Chinese',
       'prefs.toLight': 'Switch to light theme',
       'prefs.toDark': 'Switch to dark theme',
+      'prefs.layout': 'Layout',
+      'prefs.layoutTitle': 'Layout: {mode}',
+      'prefs.layoutAuto': 'Auto',
+      'prefs.layoutStack': 'Stacked',
+      'prefs.layoutSide': 'Side by side',
       'common.loading': 'Loading…',
       'common.copied': 'Copied ✓',
       'common.home': 'Back to home',
@@ -146,6 +227,11 @@
       'prefs.lang': '切换到英文',
       'prefs.toLight': '切换到亮色主题',
       'prefs.toDark': '切换到暗色主题',
+      'prefs.layout': '排版',
+      'prefs.layoutTitle': '排版：{mode}',
+      'prefs.layoutAuto': '自适应',
+      'prefs.layoutStack': '竖向',
+      'prefs.layoutSide': '横向',
       'common.loading': '加载中…',
       'common.copied': '已复制 ✓',
       'common.home': '返回首页',
@@ -160,7 +246,8 @@
   });
 
   window.I18N = {
-    t, add, apply, setLang, span, htmlSpan, dateSpan, setKey,
+    t, add, apply, setLang, setLayout,
+    get layout() { return layout; }, span, htmlSpan, dateSpan, setKey,
     get lang() { return lang; },
     get locale() { return locale(); },
     date: fmtDate,

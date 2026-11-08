@@ -23,7 +23,8 @@ historyBox.addEventListener('scroll',updateHistoryFade,{passive:true});
 // 都放不下 (约 240px, 如笔记本、1080p 显示器) 才改成左右两栏, 列表与左边卡片底部对齐。
 // 是否两栏每次都按上下排列实际量一遍再决定 (同一次脚本执行内完成, 不会闪); 屏幕高度取 100svh (手机地址栏收起/展开时不变);
 // 超宽屏整页放大 (app.css 里的 zoom) 时量到的是放大后的像素, 换算回 CSS 像素
-const HISTORY_MIN=110,SINGLE_COL_MIN=240,TWO_COL_MIN_W=860,svhProbe=document.createElement('div');
+// 右上角可以手动选竖向 / 横向 (<html data-layout>): 竖向时列表至少约三条高 (页面可能需要滚动); 横向在窄于 SIDE_MIN_W 时放不下, 仍按竖向
+const HISTORY_MIN=110,SINGLE_COL_MIN=240,TWO_COL_MIN_W=860,SIDE_MIN_W=720,svhProbe=document.createElement('div');
 svhProbe.style.cssText='position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none';document.body.appendChild(svhProbe);
 function fitHistory(){
   const z=parseFloat(getComputedStyle(document.documentElement).zoom)||1;
@@ -32,15 +33,17 @@ function fitHistory(){
   grid.classList.remove('two-col');
   const ms=getComputedStyle(main);
   let avail=viewH-(main.getBoundingClientRect().height+(parseFloat(ms.marginTop)+parseFloat(ms.marginBottom))*z-h.getBoundingClientRect().height);
-  if(innerWidth/z>=TWO_COL_MIN_W&&avail/z<SINGLE_COL_MIN){
+  const pref=document.documentElement.dataset.layout,w=innerWidth/z;
+  if(pref==='side'?w>=SIDE_MIN_W:pref!=='stack'&&w>=TWO_COL_MIN_W&&avail/z<SINGLE_COL_MIN){
     grid.classList.add('two-col');
     const cs=getComputedStyle(h.closest('.card'));
     avail=$('#mainCard').getBoundingClientRect().bottom-h.getBoundingClientRect().top-(parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth))*z;
   }
-  h.style.maxHeight=Math.max(HISTORY_MIN,Math.floor(avail/z))+'px';
+  h.style.maxHeight=Math.max(pref==='stack'&&w>=TWO_COL_MIN_W?SINGLE_COL_MIN:HISTORY_MIN,Math.floor(avail/z))+'px';
   updateHistoryFade();
 }
 addEventListener('resize',fitHistory);
+document.addEventListener('layoutchange',fitHistory);
 // 上传进度 / 结果出现等让左边卡片变高时也重新算
 // (下一帧再算: fitHistory 自己会临时改变卡片大小, 在回调里直接算会触发 ResizeObserver 的循环警告)
 if(window.ResizeObserver)new ResizeObserver(()=>requestAnimationFrame(fitHistory)).observe($('#mainCard'));
