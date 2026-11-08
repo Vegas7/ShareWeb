@@ -6,6 +6,7 @@ I18N.add({
     'share.textTitle': 'Text share ✓',
     'share.clickSelect': 'Click to select all',
     'share.sha': 'SHA-256 checksum',
+    'share.code': 'Share code',
     'share.clickToCopy': 'Click to copy',
     'share.copyText': 'Copy all text',
     'share.copiedText': 'Text copied ✓',
@@ -58,6 +59,7 @@ I18N.add({
     'share.textTitle': '文字共享 ✓',
     'share.clickSelect': '点击可全选',
     'share.sha': 'SHA-256 校验码',
+    'share.code': '提取码',
     'share.clickToCopy': '点击复制',
     'share.copyText': '复制全部文字',
     'share.copiedText': '已复制文字 ✓',
@@ -130,17 +132,29 @@ function flash(btn, key, restoreKey) {
 function shaBlock(sha) {
   return `<div class="copy-block share-sha"><div class="copy-head"><span class="copy-label">${S('share.sha')}</span><span class="copy-hint" data-i18n="share.clickToCopy">${esc(t('share.clickToCopy'))}</span></div><button type="button" class="copy-sha" id="copyShaBtn">${esc(sha || '-')}</button></div>`;
 }
-function bindSha(sha) {
-  const el = document.querySelector('#copyShaBtn');
+// 提取码: 与首页上传结果同款的数字格 (小一号), 点击复制
+function codeBlock(d) {
+  if (!d.code) return '';
+  const digits = String(d.code).split('').map(c => `<span class="cbox">${esc(c)}</span>`).join('');
+  return `<div class="copy-block share-code"><div class="copy-head"><span class="copy-label">${S('share.code')}</span><span class="copy-hint" data-i18n="share.clickToCopy">${esc(t('share.clickToCopy'))}</span></div><button type="button" class="copy-code-group" id="copyCodeBtn" aria-label="${esc(d.code)}">${digits}</button></div>`;
+}
+// 点击复制: 元素变绿、标题行提示变成「已复制 ✓」, 2 秒后恢复 (提取码与 SHA-256 共用)
+function bindCopy(el, value) {
+  if (!el) return;
   const hint = el.closest('.copy-block').querySelector('.copy-hint');
   el.onclick = async () => {
     const reset = () => { clearTimeout(el._flash); el.classList.remove('copied'); setKey(hint, 'share.clickToCopy'); hint.classList.remove('done'); if (lastFlash && lastFlash.el === el) lastFlash = null; };
     takeFlash(el, reset);
-    await copy(sha || '');
+    await copy(value || '');
     el.classList.add('copied'); setKey(hint, 'common.copied'); hint.classList.add('done');
     clearTimeout(el._flash);
     el._flash = setTimeout(reset, 2000);
   };
+}
+// 提取码和 SHA-256 的点击复制 (每个页面都有这两块)
+function bindCodeAndSha(d) {
+  bindCopy(document.querySelector('#copyCodeBtn'), d.code);
+  bindCopy(document.querySelector('#copyShaBtn'), d.sha256);
 }
 function abToB64(buf) {
   const bytes = new Uint8Array(buf);
@@ -165,7 +179,7 @@ fetch('/api/share/' + encodeURIComponent(token))
     // 文本分享没有文件名时, 历史记录里存当前语言的 "文本内容"。
     const filename = d.filename || (d.type === 'text' ? t('share.textName') : 'download.bin');
     const isImage = d.type === 'file' && (d.mime_type || '').toLowerCase().startsWith('image/');
-    addHistory({ token: d.token, name: filename, filename, type: d.type || 'file', size: d.size || 0, role: 'receiver' });
+    addHistory({ token: d.token, name: filename, filename, type: d.type || 'file', size: d.size || 0, role: 'receiver', code: d.code, url: d.url });
     setKey(box, null);
     // 有效期作为 {date} 变量, 切换语言时按新语言重新格式化; 没有则显示 "永久有效"。
     const exp = { date: d.expires_at || '' };
@@ -249,11 +263,12 @@ function renderText(d, exp) {
     <div class="result-box" style="margin-top:0;">
       <h2>${S('share.textTitle')}</h2>
       <p><span class="meta">${S('share.validUntil', { d: exp })}</span></p>
+      ${codeBlock(d)}
       <div id="textContent" class="text-content" data-i18n-title="share.clickSelect" title="${esc(t('share.clickSelect'))}">${esc(d.text || '')}</div>
       ${shaBlock(d.sha256)}
       <button class="primary accent wide" id="copyTextBtn" data-i18n="share.copyText">${esc(t('share.copyText'))}</button>
     </div>`;
-  bindSha(d.sha256);
+  bindCodeAndSha(d);
   document.querySelector('#copyTextBtn').onclick = e => { copy(d.text || ''); flash(e.currentTarget, 'share.copiedText', 'share.copyText'); };
   const tBox = document.querySelector('#textContent');
   tBox.onclick = () => { const sel = window.getSelection(), rg = document.createRange(); rg.selectNodeContents(tBox); sel.removeAllRanges(); sel.addRange(rg); };
@@ -269,6 +284,7 @@ function renderImage(d, filename, exp) {
         <strong style="font-size:18px;word-break:break-all;">${esc(filename)}</strong><br>
         <span class="meta">${S('share.fileMeta', { size: fmtSize(d.size), d: exp, n: d.download_count ?? 0 })}</span>
       </p>
+      ${codeBlock(d)}
       <img src="${url}?inline=1" alt="${esc(filename)}" style="max-width:100%;border-radius:12px;border:1px solid var(--card-border);display:block;margin:10px 0">
       ${shaBlock(d.sha256)}
       <a class="primary accent wide button" id="dlBtn" href="${url}" download="${esc(filename)}" data-i18n="share.download">${esc(t('share.download'))}</a>
@@ -276,7 +292,7 @@ function renderImage(d, filename, exp) {
       <div id="imgMsg" class="meta" style="margin-top:8px"></div>
       ${githubBlock(d)}
     </div>`;
-  bindSha(d.sha256);
+  bindCodeAndSha(d);
   bindGithub(d, filename);
   document.querySelector('#copyImgBtn').onclick = async e => {
     const btn = e.currentTarget;
@@ -324,6 +340,7 @@ function renderFile(d, filename, exp) {
         <strong style="font-size:18px;word-break:break-all;">${esc(filename)}</strong><br>
         <span class="meta">${S('share.fileMeta', { size: fmtSize(d.size), d: exp, n: d.download_count ?? 0 })}</span>
       </p>
+      ${codeBlock(d)}
       ${playerHtml}
       ${shaBlock(d.sha256)}
       <a class="primary accent wide button" id="dlBtn" href="${downloadUrl}" download="${esc(filename)}" data-i18n="share.download">${esc(t('share.download'))}</a>
@@ -361,7 +378,7 @@ function renderFile(d, filename, exp) {
       ${githubBlock(d)}
     </div>`;
 
-  bindSha(d.sha256);
+  bindCodeAndSha(d);
 
   const mediaEl = document.querySelector('#mediaEl');
   if (mediaEl) {

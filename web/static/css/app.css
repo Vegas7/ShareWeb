@@ -162,7 +162,7 @@ button,.button{font:inherit}
 .narrow-btn{display:flex;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:14px auto 0}
 .code-inputs input{width:100%;height:var(--code-box-h);padding:0;text-align:center;font-family:"Tilt Neon",system-ui,sans-serif;font-size:var(--code-font);font-weight:400;border:1px solid var(--field-border);border-radius:14px;background:var(--field);color:var(--text)}
 .code-inputs input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
-.sender-history{display:flex;align-items:center;gap:14px;margin-top:5px}
+.history-share{display:flex;align-items:center;gap:14px;margin-top:5px}
 /* 分享页 GitHub 直链行 (输入框 + 打开按钮) */
 .history-url{display:flex;gap:10px;align-items:center}
 .history-url .input{min-width:0}
@@ -201,6 +201,10 @@ button,.button{font:inherit}
 .copy-sha.copied{color:var(--ok);border-color:var(--ok)}
 /* 提取页的 SHA-256: 同款样式, 但跟随页面居左、占满宽度 */
 .copy-block.share-sha{width:auto;margin:16px 0 0}
+/* 提取页的提取码: 首页同款数字格, 小一号, 靠左 */
+.copy-block.share-code{width:auto;margin:4px 0 14px;--code-box-w:46px;--code-box-h:58px;--code-font:38px;--code-gap:8px}
+.share-code .copy-head{justify-content:flex-start}
+.share-code .copy-code-group{align-self:flex-start;margin:2px 0 0}
 .share-sha .copy-sha{align-self:flex-start;max-width:100%}
 /* 本地历史: 同样的复制框, 但居左、紧凑 */
 .copy-inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -244,9 +248,9 @@ button,.button{font:inherit}
 @media (prefers-reduced-motion:reduce){.history-actions .link{transition:none}.history-actions .link.anim-arm,.history-actions .link.anim-disarm{animation:none}}
 .history-status .tag{margin-left:8px;vertical-align:1px}
 .tag.gone{background:var(--danger-soft);color:var(--danger)}
-.history-item.gone .history-link,.history-item.gone b{color:var(--faint);text-decoration:line-through}
+.history-item.gone .history-link{color:var(--faint);text-decoration:line-through}
 /* 已删除/已过期的条目: 提取码和链接已不可用, 不再显示, 只保留名称 + 标签 + 时间 */
-.history-item.gone .sender-history{display:none}
+.history-item.gone .history-share{display:none}
 /* 手机上「本地历史」标题和两个清除按钮挤在一行 (英文按钮较长, 否则会换行多占一行) */
 @media(max-width:420px){.history-actions{gap:0}.history-actions .link{padding:4px 6px;font-size:15px}.history-actions .link:last-child{margin-right:-6px}}
 /* 历史卡片较窄时 (手机, 或两栏布局里窗口不够宽) 时间换到第二行, 给文件名留出位置 */

@@ -65,20 +65,23 @@ def create_share_text(storage_name, storage_path, size, sha256, ip, user_agent):
 def share_status(tokens):
     """首页「本地历史」用: 只读地查询一批分享是否还在。
 
-    返回 {token: "ok" | "expired" | "deleted"}。不像 get_share_by_token 那样顺带停用/删除过期文件。
+    返回 ({token: "ok" | "expired" | "deleted"}, {仍有效的 token: 提取码})。
+    不像 get_share_by_token 那样顺带停用/删除过期文件。
     """
     tokens = [t for t in dict.fromkeys(tokens) if t]
     if not tokens:
-        return {}
+        return {}, {}
     now = iso(utcnow())
     marks = ",".join("?" * len(tokens))
     with connect() as conn:
-        rows = conn.execute(f"SELECT token, active, expires_at, locked FROM shares WHERE token IN ({marks})", tokens).fetchall()
-    found = {}
+        rows = conn.execute(f"SELECT token, code, active, expires_at, locked FROM shares WHERE token IN ({marks})", tokens).fetchall()
+    found, codes = {}, {}
     for r in rows:
         alive = r["active"] and (r["locked"] or not r["expires_at"] or r["expires_at"] > now)
         found[r["token"]] = "ok" if alive else "expired"
-    return {t: found.get(t, "deleted") for t in tokens}
+        if alive:
+            codes[r["token"]] = r["code"]
+    return {t: found.get(t, "deleted") for t in tokens}, codes
 
 
 def get_active_file_by_sha256(sha256):

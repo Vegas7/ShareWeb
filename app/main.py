@@ -179,10 +179,12 @@ async def public_config():
 
 @app.post("/api/share-status")
 async def share_status_api(request: Request, payload: ShareStatusRequest):
-    """首页本地历史标注「已删除 / 已过期」用; 只返回状态, 不返回任何内容。"""
+    """首页本地历史用: 标注「已删除 / 已过期」, 并补上还有效的分享的提取码 (旧的历史记录里没存)。
+    持有链接 (token) 就能打开分享, 提取码与链接等价, 返回给 token 持有者不会多泄露什么。"""
     ensure_not_blacklisted(request)
     tokens = [t for t in payload.tokens if isinstance(t, str) and 0 < len(t) <= 64]
-    return {"status": await run_in_threadpool(share_status, tokens)}
+    status, codes = await run_in_threadpool(share_status, tokens)
+    return {"status": status, "codes": codes}
 
 def _share_payload(row) -> dict:
     return {"token": row["token"], "code": row["code"], "filename": row["original_name"], "size": row["size"],
@@ -316,7 +318,7 @@ async def share_meta(token: str, request: Request):
     # 密钥对持有分享链接的人可见 (加密下载的授权对象即链接持有者)。
     enc_key = row["enc_key"] if row["type"] == "file" else None
     github_available = github_mirror.enabled() and row["type"] == "file" and github_mirror.fits(row["size"] or 0)
-    return {"token": row["token"], "type": row["type"], "filename": row["original_name"], "size": row["size"], "sha256": row["sha256"], "mime_type": row["mime_type"], "text": text, "created_at": row["created_at"], "expires_at": None if row["locked"] else row["expires_at"], "download_count": row["download_count"], "enc_key": enc_key, "github": github_available}
+    return {"token": row["token"], "code": row["code"], "url": f"{settings.public_base_url}/share/{row['token']}", "type": row["type"], "filename": row["original_name"], "size": row["size"], "sha256": row["sha256"], "mime_type": row["mime_type"], "text": text, "created_at": row["created_at"], "expires_at": None if row["locked"] else row["expires_at"], "download_count": row["download_count"], "enc_key": enc_key, "github": github_available}
 
 
 @app.get("/api/share/{token}/github")
