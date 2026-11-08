@@ -181,6 +181,15 @@ button,.button{font:inherit}
 .copy{margin-left:8px}
 .history-item{padding:13px 0;border-bottom:1px solid var(--card-border)}
 .history-item:last-child{border-bottom:0}
+/* 记录多时列表内部滚动, 不把整页撑得很长; 滚动条放进卡片右侧留白里, 列表内容仍与卡片标题对齐 */
+#history{max-height:min(560px,65vh);overflow-y:auto;margin-right:-14px;padding-right:14px;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--faint) 45%,transparent) transparent}
+#history::-webkit-scrollbar{width:6px}
+#history::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--faint) 45%,transparent);border-radius:3px}
+#history::-webkit-scrollbar-track{background:transparent}
+/* 上 / 下方还有内容时边缘渐隐, 提示可以滚动 (手机上滚动条平时不显示); 右侧滚动条那一条不受影响 */
+#history.more-above,#history.more-below{--fade-top:#000;--fade-bottom:#000;-webkit-mask:linear-gradient(var(--fade-top),#000 28px,#000 calc(100% - 40px),var(--fade-bottom)),linear-gradient(#000,#000) right/14px 100% no-repeat;mask:linear-gradient(var(--fade-top),#000 28px,#000 calc(100% - 40px),var(--fade-bottom)),linear-gradient(#000,#000) right/14px 100% no-repeat}
+#history.more-above{--fade-top:transparent}
+#history.more-below{--fade-bottom:transparent}
 .history-link{color:var(--text);text-decoration:none;font-weight:600}
 .history-link:hover{color:var(--accent)}
 /* 清除按钮: 两种状态内边距相同, 变成「确认」时只换颜色, 不会挤动布局 */
