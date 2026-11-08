@@ -3,6 +3,10 @@
 存在数据库 app_settings 表里, 启动时读入并覆盖 settings 上对应的字段 (.env 中的值只作默认值)。
 只有一个 uvicorn 进程, 改动后直接更新内存中的 settings 即可立即生效。
 """
+import base64
+import hashlib
+import hmac
+import os
 import shutil
 
 from .config import settings
@@ -44,6 +48,45 @@ def set_max_upload_mb(mb: int):
 def set_auto_evict(on: bool):
     _save("auto_evict", "1" if on else "0")
     settings.auto_evict = on
+
+
+# ---- 管理员密码 ----
+# 在后台改过密码后, 数据库里存 scrypt 哈希, .env 里的 SHAREWEB_ADMIN_PASSWORD 不再生效;
+# 删掉这一行 (见 README「忘记管理员密码」) 即恢复使用 .env 里的密码。
+_ADMIN_PW_KEY = "admin_password_hash"
+MIN_ADMIN_PASSWORD = 8
+_SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2 ** 14, 8, 1
+
+
+def _get(key: str) -> str | None:
+    with connect() as conn:
+        row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def admin_password_changed() -> bool:
+    return _get(_ADMIN_PW_KEY) is not None
+
+
+def check_admin_password(password: str) -> bool:
+    stored = _get(_ADMIN_PW_KEY)
+    if stored is None:
+        return hmac.compare_digest(password.encode(), settings.admin_password.encode())
+    try:
+        algo, n, r, p, salt, digest = stored.split("$")
+        expected = base64.b64decode(digest)
+        actual = hashlib.scrypt(password.encode(), salt=base64.b64decode(salt), n=int(n), r=int(r), p=int(p),
+                                dklen=len(expected))
+    except ValueError:
+        return False
+    return algo == "scrypt" and hmac.compare_digest(actual, expected)
+
+
+def set_admin_password(password: str):
+    salt = os.urandom(16)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P, dklen=32)
+    b64 = lambda b: base64.b64encode(b).decode()
+    _save(_ADMIN_PW_KEY, f"scrypt${_SCRYPT_N}${_SCRYPT_R}${_SCRYPT_P}${b64(salt)}${b64(digest)}")
 
 
 def default_max_upload_mb() -> int:

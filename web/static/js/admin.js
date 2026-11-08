@@ -33,7 +33,10 @@ I18N.add({
     'admin.visReason': 'Reason: {r}', 'admin.visUnknownGeo': 'Unknown location', 'admin.visPrivate': 'Private / local network',
     'admin.visBlocked': 'Blocked {n} IPs.', 'admin.visBlockedSelf': 'Blocked {n} IPs. Skipped your own IP ({ip}) so you don\'t lock yourself out.',
     'admin.visAllowed': 'Allowed {n} IPs.', 'admin.visFailed': 'Failed: {msg}', 'admin.visCredit': 'IP location data',
-    'admin.navOverview': 'Overview', 'admin.navFiles': 'Files', 'admin.navSecurity': 'Security', 'admin.navAdvanced': 'Advanced',
+    'admin.navOverview': 'Overview', 'admin.navFiles': 'Files', 'admin.navSecurity': 'Security', 'admin.navAdvanced': 'Advanced', 'admin.navPassword': 'Password',
+    'admin.pwTitle': 'Change admin password', 'admin.pwCurrent': 'Current password', 'admin.pwNew': 'New password', 'admin.pwConfirm': 'Confirm new password', 'admin.pwSave': 'Change password',
+    'admin.pwFromEnv': 'Currently using SHAREWEB_ADMIN_PASSWORD from .env. Once changed here, the new password replaces it.', 'admin.pwChanged': 'The password has been changed here, so SHAREWEB_ADMIN_PASSWORD in .env no longer works. If you forget it, see "Forgot the admin password" in the README.', 'admin.pwSignOut': 'Changing it signs out every other device.',
+    'admin.pwNeedCurrent': 'Enter the current password', 'admin.pwTooShort': 'The new password needs at least {n} characters', 'admin.pwMismatch': 'The two new passwords don\'t match', 'admin.pwSame': 'The new password is the same as the current one', 'admin.pwWrong': 'The current password is wrong', 'admin.pwDone': 'Password changed ✓', 'admin.pwDoneOthers': 'Password changed ✓ Signed out {n} other session(s)', 'admin.pwFailed': 'Failed to change the password: {msg}',
     'admin.trendTitle': 'Uploads & downloads', 'admin.trendUploads': 'Uploads', 'admin.trendDownloads': 'Downloads',
     'admin.days7': '7 days', 'admin.days14': '14 days', 'admin.days30': '30 days', 'admin.chartFailed': 'Failed to load chart data: {msg}',
     'admin.typesTitle': 'Storage by type', 'admin.typesSub': 'Active shares, by size', 'admin.typesEmpty': 'No active shares',
@@ -93,7 +96,10 @@ I18N.add({
     'admin.visReason': '原因：{r}', 'admin.visUnknownGeo': '未知地区', 'admin.visPrivate': '内网 / 本机地址',
     'admin.visBlocked': '已封禁 {n} 个 IP。', 'admin.visBlockedSelf': '已封禁 {n} 个 IP；已跳过你当前的 IP（{ip}），以免把自己挡在外面。',
     'admin.visAllowed': '已解封 {n} 个 IP。', 'admin.visFailed': '操作失败：{msg}', 'admin.visCredit': 'IP 位置数据',
-    'admin.navOverview': '总览', 'admin.navFiles': '文件管理', 'admin.navSecurity': '安全设置', 'admin.navAdvanced': '高级设置',
+    'admin.navOverview': '总览', 'admin.navFiles': '文件管理', 'admin.navSecurity': '安全设置', 'admin.navAdvanced': '高级设置', 'admin.navPassword': '管理员密码',
+    'admin.pwTitle': '修改管理员密码', 'admin.pwCurrent': '当前密码', 'admin.pwNew': '新密码', 'admin.pwConfirm': '确认新密码', 'admin.pwSave': '修改密码',
+    'admin.pwFromEnv': '当前使用 .env 中的 SHAREWEB_ADMIN_PASSWORD。在这里修改后以新密码为准。', 'admin.pwChanged': '密码已在后台修改过，.env 中的 SHAREWEB_ADMIN_PASSWORD 不再生效。忘记密码时参见 README 中的「忘记管理员密码」。', 'admin.pwSignOut': '修改后，其他设备上的登录会全部退出。',
+    'admin.pwNeedCurrent': '请输入当前密码', 'admin.pwTooShort': '新密码至少需要 {n} 个字符', 'admin.pwMismatch': '两次输入的新密码不一致', 'admin.pwSame': '新密码与当前密码相同', 'admin.pwWrong': '当前密码不正确', 'admin.pwDone': '密码已修改 ✓', 'admin.pwDoneOthers': '密码已修改 ✓ 已退出其他 {n} 处登录', 'admin.pwFailed': '修改失败：{msg}',
     'admin.trendTitle': '上传与下载', 'admin.trendUploads': '上传', 'admin.trendDownloads': '下载',
     'admin.days7': '7 天', 'admin.days14': '14 天', 'admin.days30': '30 天', 'admin.chartFailed': '图表数据加载失败：{msg}',
     'admin.typesTitle': '按类型的存储占用', 'admin.typesSub': '当前有效的共享，按占用大小', 'admin.typesEmpty': '暂无有效共享',
@@ -453,6 +459,7 @@ function showPanel(on) {
   $('#loginCard').classList.toggle('hidden', on);
   $('#panel').classList.toggle('hidden', !on);
   $('#logout').classList.toggle('hidden', !on);
+  if (on) revealActiveNav();
 }
 
 // 打开页面时: 已登录就直接显示后台, 否则显示登录框
@@ -513,6 +520,12 @@ document.querySelectorAll('.cleanup-btn').forEach(btn => {
 // ---- 左侧菜单: 按 #hash 切换视图, 刷新后停留在当前页 ----
 // 标签页列表取自页面里的 .admin-view, 新增标签页只需改 HTML (第一个为默认页)
 const VIEWS = [...document.querySelectorAll('.admin-view')].map(el => el.dataset.view);
+// 窄屏时菜单是横向滚动的一行: 把当前项滚到中间 (只滚菜单本身, 不动页面)。
+// 后台还没显示 (登录框) 时量不出宽度, 所以登录后 showPanel 里会再调一次
+function revealActiveNav() {
+  const nav = $('.admin-nav'), a = nav.querySelector('a.active');
+  if (a && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: a.offsetLeft - nav.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2, behavior: 'smooth' });
+}
 function showView() {
   const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : VIEWS[0];
   document.querySelectorAll('.admin-nav a').forEach(a => {
@@ -520,6 +533,7 @@ function showView() {
     a.classList.toggle('active', on);
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
+  revealActiveNav();
   document.querySelectorAll('.admin-view').forEach(el => el.classList.toggle('active', el.dataset.view === v));
   hideTip();
 }
@@ -768,6 +782,7 @@ async function loadSettings() {
   try {
     adminSettings = await api('/api/admin/settings');
     renderSettings();
+    renderPwSource();
   } catch (e) {
     setKey($('#limitMsg'), 'admin.lockFailed', { msg: e.message });
   }
@@ -817,3 +832,37 @@ $('#limitSave').onclick = async () => {
 renderVisControls();
 showView();
 checkAuth();
+
+// ---- 管理员密码 ----
+function renderPwSource() {
+  const changed = adminSettings && adminSettings.admin_password_changed;
+  $('#pwSource').innerHTML = `${S(changed ? 'admin.pwChanged' : 'admin.pwFromEnv')}<br>${S('admin.pwSignOut')}`;
+}
+function pwMsg(key, args, ok = false) {
+  setKey($('#pwMsg'), key, args);
+  $('#pwMsg').classList.toggle('ok', ok && !!key);
+  $('#pwMsg').classList.toggle('err', !ok && !!key);
+}
+$('#pwForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const current = $('#pwCurrent').value, pw = $('#pwNew').value, min = adminSettings?.min_admin_password || 8;
+  if (!current) { pwMsg('admin.pwNeedCurrent'); $('#pwCurrent').focus(); return; }
+  if (pw.length < min) { pwMsg('admin.pwTooShort', { n: min }); $('#pwNew').focus(); return; }
+  if (pw !== $('#pwConfirm').value) { pwMsg('admin.pwMismatch'); $('#pwConfirm').focus(); return; }
+  if (pw === current) { pwMsg('admin.pwSame'); $('#pwNew').focus(); return; }
+  $('#pwSave').disabled = true;
+  pwMsg(null);
+  try {
+    const r = await fetch('/api/admin/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current, new: pw }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 403) { pwMsg('admin.pwWrong'); $('#pwCurrent').select(); return; }
+    if (!r.ok) { pwMsg('admin.pwFailed', { msg: d.detail || r.status }); return; }
+    $('#pwForm').reset();
+    if (d.signed_out) pwMsg('admin.pwDoneOthers', { n: d.signed_out }, true); else pwMsg('admin.pwDone', null, true);
+    if (adminSettings) { adminSettings.admin_password_changed = true; renderPwSource(); }
+  } catch (err) {
+    pwMsg('admin.pwFailed', { msg: err.message });
+  } finally {
+    $('#pwSave').disabled = false;
+  }
+});

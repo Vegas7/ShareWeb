@@ -431,6 +431,11 @@ html.admin-page{scrollbar-gutter:stable}
 .limit-info{margin-top:14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--muted) 7%,transparent);font-size:13.5px;color:var(--muted);display:grid;gap:4px}
 .limit-info b{color:var(--text);font-variant-numeric:tabular-nums}
 .limit-info .warn{color:var(--warn)}
+.pw-form{display:grid;gap:14px;max-width:420px;margin-top:18px}
+.pw-field{display:grid;gap:6px}
+.pw-field > span{font-size:13px;color:var(--muted)}
+.pw-msg.ok{color:var(--ok)}
+.pw-msg.err{color:var(--danger)}
 .setting-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
 .setting-row h2{margin-bottom:6px}
 /* 开关 */

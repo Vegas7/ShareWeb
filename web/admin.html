@@ -7,7 +7,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="stylesheet" href="/static/css/app.css?v=20261108-2">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261108-3">
   <script src="/static/js/prefs.js?v=20261022-2"></script>
 </head>
 <body>
@@ -43,6 +43,7 @@
         <a href="#files" data-view="files"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span data-i18n="admin.navFiles">Files</span></a>
         <a href="#security" data-view="security"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/></svg><span data-i18n="admin.navSecurity">Security</span></a>
         <a href="#advanced" data-view="advanced"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-i18n="admin.navAdvanced">Advanced</span></a>
+        <a href="#password" data-view="password"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.7-9.7M17 6l3 3M14.5 8.5l2 2"/></svg><span data-i18n="admin.navPassword">Password</span></a>
       </nav>
 
       <!-- 每个标签页 = 左侧菜单里一个 <a href="#名称" data-view="名称"> + 这里一个 <div class="admin-view" data-view="名称">。
@@ -226,10 +227,32 @@
             <div id="evictMsg" class="meta" style="margin-top:10px"></div>
           </section>
         </div>
+
+        <!-- 管理员密码 -->
+        <div class="admin-view" data-view="password">
+          <section class="card">
+            <h2 data-i18n="admin.pwTitle">Change admin password</h2>
+            <p class="meta" id="pwSource"></p>
+            <form id="pwForm" class="pw-form" novalidate>
+              <!-- 给密码管理器用的用户名 (不显示) -->
+              <input type="text" name="username" value="admin" autocomplete="username" hidden>
+              <label class="pw-field"><span data-i18n="admin.pwCurrent">Current password</span>
+                <input id="pwCurrent" class="input" type="password" autocomplete="current-password"></label>
+              <label class="pw-field"><span data-i18n="admin.pwNew">New password</span>
+                <input id="pwNew" class="input" type="password" autocomplete="new-password"></label>
+              <label class="pw-field"><span data-i18n="admin.pwConfirm">Confirm new password</span>
+                <input id="pwConfirm" class="input" type="password" autocomplete="new-password"></label>
+              <div class="row">
+                <button id="pwSave" class="primary accent" type="submit" data-i18n="admin.pwSave">Change password</button>
+                <span id="pwMsg" class="meta pw-msg" role="status"></span>
+              </div>
+            </form>
+          </section>
+        </div>
       </div>
     </div>
   </main>
   <div class="chart-tip hidden" id="chartTip" role="status"></div>
-  <script src="/static/js/admin.js?v=20261022-26"></script>
+  <script src="/static/js/admin.js?v=20261108-3"></script>
 </body>
 </html>

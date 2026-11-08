@@ -142,6 +142,10 @@ class AdminLockFilesRequest(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=1000)
     locked: bool
 
+class AdminPasswordRequest(BaseModel):
+    current: str = Field(max_length=256)
+    new: str = Field(min_length=app_settings.MIN_ADMIN_PASSWORD, max_length=256)
+
 class AdminSettingsRequest(BaseModel):
     # 只修改传了的字段。单文件上限 (MB); 0 = 不限制 (仍受磁盘剩余空间约束)
     max_upload_mb: Optional[int] = Field(default=None, ge=0, le=app_settings.MAX_UPLOAD_MB_CAP)
@@ -420,7 +424,7 @@ async def download(token: str, request: Request, enc: int = 0, inline: int = 0):
 @app.post("/api/admin/login")
 async def admin_login(request: Request, payload: AdminLoginRequest):
     ip = client_ip(request)
-    if not secrets.compare_digest(payload.password, settings.admin_password):
+    if not await run_in_threadpool(app_settings.check_admin_password, payload.password):
         log_event(ip, "ADMIN_LOGIN", "FAIL", detail="BAD_PASSWORD", user_agent=request.headers.get("user-agent","-"), level=logging.WARNING)
         raise HTTPException(401, "invalid password")
     token = secrets.token_urlsafe(32)
@@ -556,6 +560,8 @@ def _settings_payload():
         "capacity_bytes": app_settings.upload_capacity_bytes(),
         "disk_reserve_bytes": app_settings.DISK_RESERVE_BYTES,
         "disk": {"total": total, "used": used, "free": free},
+        "admin_password_changed": app_settings.admin_password_changed(),
+        "min_admin_password": app_settings.MIN_ADMIN_PASSWORD,
     }
 
 @admin_api.get("/settings")
@@ -574,6 +580,20 @@ async def admin_put_settings(request: Request, payload: AdminSettingsRequest):
     if changes:
         log_event(client_ip(request), "ADMIN_SETTINGS", "SUCCESS", detail=" ".join(changes))
     return {"ok": True, **(await run_in_threadpool(_settings_payload))}
+
+@admin_api.post("/password")
+async def admin_change_password(request: Request, payload: AdminPasswordRequest,
+                                shareweb_admin: str | None = Cookie(default=None)):
+    """修改管理员密码 (要求输入当前密码); 成功后其他设备上的登录全部失效, 当前这个保留。"""
+    ip = client_ip(request)
+    if not await run_in_threadpool(app_settings.check_admin_password, payload.current):
+        log_event(ip, "ADMIN_PASSWORD", "FAIL", detail="BAD_CURRENT_PASSWORD", user_agent=request.headers.get("user-agent","-"), level=logging.WARNING)
+        raise HTTPException(403, "wrong current password")
+    await run_in_threadpool(app_settings.set_admin_password, payload.new)
+    with connect() as conn:
+        ended = conn.execute("DELETE FROM admin_sessions WHERE token<>?", (shareweb_admin or "",)).rowcount
+    log_event(ip, "ADMIN_PASSWORD", "SUCCESS", detail=f"OTHER_SESSIONS_ENDED={ended}", user_agent=request.headers.get("user-agent","-"))
+    return {"ok": True, "signed_out": ended}
 
 @admin_api.post("/cleanup")
 async def admin_cleanup(request: Request, payload: AdminCleanupRequest):
