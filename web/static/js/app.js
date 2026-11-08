@@ -19,22 +19,27 @@ function updateHistoryButtons(){const g=$('#clearGone');g.disabled=historyGone.s
 const historyBox=$('#history');
 function updateHistoryFade(){const h=historyBox;h.classList.toggle('more-above',h.scrollTop>1);h.classList.toggle('more-below',h.scrollTop+h.clientHeight<h.scrollHeight-1)}
 historyBox.addEventListener('scroll',updateHistoryFade,{passive:true});
-// 列表高度: 尽量让整页一屏显示完。两栏时与左边卡片底部对齐; 单栏时占满屏幕剩下的高度, 但至少留约两条记录的高度。
-// 屏幕高度用 100svh (手机浏览器地址栏收起/展开时不变, 列表不会跟着滚动忽高忽低)
-const HISTORY_MIN=110,svhProbe=document.createElement('div');
+// 列表高度: 尽量让整页一屏显示完。屏幕够宽但不够高 (笔记本、1080p) 时左右两栏, 列表与左边卡片底部对齐;
+// 否则上下排列, 列表占满屏幕剩下的高度。两种情况都至少留约两条记录的高度。
+// 屏幕高度取 100svh (手机地址栏收起/展开时不变, 列表不会跟着忽高忽低); 超宽屏整页放大 (app.css 里的 zoom) 时按放大后的尺寸算
+const HISTORY_MIN=110,TWO_COL_MIN_W=860,TWO_COL_MAX_H=1100,svhProbe=document.createElement('div');
 svhProbe.style.cssText='position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none';document.body.appendChild(svhProbe);
 function fitHistory(){
-  const h=historyBox,card=h.closest('.card'),main=$('main.container'),cs=getComputedStyle(card),ms=getComputedStyle(main);
-  const below=parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth);
+  const z=parseFloat(getComputedStyle(document.documentElement).zoom)||1;
+  const viewH=Math.min(svhProbe.getBoundingClientRect().height||innerHeight,innerHeight);
+  const grid=$('.home-grid'),twoCol=innerWidth/z>=TWO_COL_MIN_W&&viewH/z<TWO_COL_MAX_H;
+  grid.classList.toggle('two-col',twoCol);
+  const h=historyBox,cs=getComputedStyle(h.closest('.card')),ms=getComputedStyle($('main.container')),box=h.getBoundingClientRect();
   let avail;
-  if(getComputedStyle($('.home-grid')).display==='grid')avail=$('#mainCard').getBoundingClientRect().bottom-h.getBoundingClientRect().top-below;
-  else avail=(svhProbe.offsetHeight||innerHeight)-(main.offsetHeight+parseFloat(ms.marginTop)+parseFloat(ms.marginBottom)-h.offsetHeight);
-  h.style.maxHeight=Math.max(HISTORY_MIN,Math.floor(avail))+'px';
+  if(twoCol)avail=$('#mainCard').getBoundingClientRect().bottom-box.top-(parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth))*z;
+  else avail=viewH-($('main.container').getBoundingClientRect().height+(parseFloat(ms.marginTop)+parseFloat(ms.marginBottom))*z-box.height);
+  h.style.maxHeight=Math.max(HISTORY_MIN,Math.floor(avail/z))+'px';
   updateHistoryFade();
 }
 addEventListener('resize',fitHistory);
 // 上传进度 / 结果出现等让左边卡片变高时也重新算
 if(window.ResizeObserver)new ResizeObserver(()=>fitHistory()).observe($('#mainCard'));
+fitHistory();  // 首次绘制前就定好一栏还是两栏, 避免闪一下
 document.fonts?.ready.then(fitHistory);
 async function renderHistory(){const box=$('#history');const items=await getHistory();historyGone=new Map();historyCount=items.length;updateHistoryButtons();if(!items.length){box.innerHTML=`<p class="muted">${S('history.empty')}</p>`;fitHistory();return}box.innerHTML=items.map(x=>{
   const name=x.name||x.filename?esc(x.name||x.filename):S('history.untitled');

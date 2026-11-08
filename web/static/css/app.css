@@ -1,5 +1,5 @@
 :root{
-  --bg:#eef1f7; --bg2:#e6eaf3;
+  --bg:#eef1f7;
   --card:#ffffff; --card-border:#e5e8f0;
   --text:#141a29; --muted:#697086; --faint:#8a91a6;
   --accent:#4f46e5; --accent-press:#4338ca; --accent-soft:#eef0ff;
@@ -20,7 +20,7 @@
 /* 暗色: 跟随系统, 除非用户手动选了亮色; 手动选暗色时无论系统如何都生效 */
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#0c0f17; --bg2:#0a0d14;
+    --bg:#0c0f17;
     --card:#141926; --card-border:#232a3b;
     --text:#e8ebf4; --muted:#9aa2b8; --faint:#767e93;
     --accent:#8b83ff; --accent-press:#a79fff; --accent-soft:#20233a;
@@ -36,7 +36,7 @@
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0c0f17; --bg2:#0a0d14;
+  --bg:#0c0f17;
   --card:#141926; --card-border:#232a3b;
   --text:#e8ebf4; --muted:#9aa2b8; --faint:#767e93;
   --accent:#8b83ff; --accent-press:#a79fff; --accent-soft:#20233a;
@@ -56,10 +56,7 @@ html,body{margin:0}
 body{
   font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   color:var(--text);
-  background:
-    radial-gradient(900px 500px at 100% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
-    linear-gradient(180deg,var(--bg),var(--bg2));
-  background-attachment:fixed;
+  background:var(--bg);
   line-height:1.55;-webkit-font-smoothing:antialiased;
 }
 /* 页面宽度: 现代常用的 1200px 内容宽度, 两侧固定留白 (桌面 24px, 手机 16px) */
@@ -250,6 +247,8 @@ button,.button{font:inherit}
 .history-item.gone .history-link,.history-item.gone b{color:var(--faint);text-decoration:line-through}
 /* 已删除/已过期的条目: 提取码和链接已不可用, 不再显示, 只保留名称 + 标签 + 时间 */
 .history-item.gone .sender-history{display:none}
+/* 手机上「本地历史」标题和两个清除按钮挤在一行 (英文按钮较长, 否则会换行多占一行) */
+@media(max-width:420px){.history-actions{gap:0}.history-actions .link{padding:4px 6px;font-size:15px}.history-actions .link:last-child{margin-right:-6px}}
 /* 历史卡片较窄时 (手机, 或两栏布局里窗口不够宽) 时间换到第二行, 给文件名留出位置 */
 .history-card{container-type:inline-size}
 @container (max-width:400px){
@@ -465,12 +464,11 @@ html.admin-page{scrollbar-gutter:stable}
 .switch input:disabled + span{opacity:.55}
 
 /* ---- 首页尽量一屏显示完 ---- */
-/* 宽屏: 左边上传 / 下载, 右边本地历史 (列表高度由 app.js 的 fitHistory 对齐到左边卡片底部) */
-@media (min-width:860px){
-  .home-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start;margin-bottom:18px}
-  .home-grid > .card{margin-bottom:0}
-  .home-grid > .history-card{align-self:stretch}
-}
+/* 够宽但不够高时 (笔记本、1080p 显示器) 才左右两栏: 左边上传 / 下载, 右边本地历史。是否两栏、列表多高
+   都由 app.js 的 fitHistory 按屏幕尺寸决定 (要考虑超宽屏的整页放大); 屏幕够高 (如 4K 150% 缩放) 时上下排列 */
+.home-grid.two-col{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start;margin-bottom:18px}
+.home-grid.two-col > .card{margin-bottom:0}
+.home-grid.two-col > .history-card{align-self:stretch}
 /* 屏幕较矮 (笔记本、手机): 收紧上下留白 */
 @media (max-height:820px){
   .home .container{margin-bottom:16px}
