@@ -1,10 +1,10 @@
 I18N.add({
-  en:{'index.pageTitle':'ShareWeb · File Station','index.dropTitle':'Drop a file here','index.dropHint':'Or click to choose one, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste text, an image or a file','index.pick':'Choose file','index.or':'or','index.pastePh':'Paste text here to share it','index.textBtn':'Create text share','index.redeemTitle':'Retrieve a share','index.redeemHint':'Enter code <b>0000</b> for instructions','index.redeemBtn':'Retrieve','index.historyTitle':'Local history','index.clear':'Clear all','index.clearGone':'Clear unavailable','index.footer':'Files are deleted automatically after {days} days · Max file size {size}','index.footerNoLimit':'Files are deleted automatically after {days} days · No file size limit','upload.tooLarge':'This file is larger than the {size} limit','upload.noSpace':'Not enough disk space on the server',
+  en:{'index.pageTitle':'ShareWeb · File Station','tab.upload':'Upload','tab.download':'Download','index.dropHintTouch':'Photos, videos or any other file','index.dropTitle':'Drop a file here','index.dropHint':'Or click to choose one, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste text, an image or a file','index.pick':'Choose file','index.or':'or','index.pastePh':'Paste text here to share it','index.textBtn':'Create text share','index.redeemTitle':'Retrieve a share','index.redeemHint':'Enter code <b>0000</b> for instructions','index.redeemBtn':'Retrieve','index.historyTitle':'Local history','index.clear':'Clear all','index.clearGone':'Clear unavailable','index.footer':'Files are deleted automatically after {days} days · Max file size {size}','index.footerNoLimit':'Files are deleted automatically after {days} days · No file size limit','upload.tooLarge':'This file is larger than the {size} limit','upload.noSpace':'Not enough disk space on the server',
     'history.empty':'No records yet','history.untitled':'Shared content','history.sender':'Sent','history.code':'Code','history.text':'Text','history.deleted':'Deleted','history.expired':'Expired','history.goneTip':'This share is no longer available on the server','history.noneGone':'No unavailable entries','history.confirm':'Confirm','history.confirmAllTip':'Click again to remove all {n} entries from this browser\'s history (files on the server are not affected). Click elsewhere to cancel.','history.confirmGoneTip':'Click again to remove {n} deleted or expired entries. Click elsewhere to cancel.',
     'result.duplicate':'Already on the server ✓','result.done':'Upload complete ✓','result.validUntil':'Valid until {d}','result.code':'Share code','result.link':'Share link','result.clickToCopy':'Click to copy','result.copyFailed':'Copy failed, please copy manually',
     'upload.hashing':'Computing SHA-256…','upload.hashPct':'Computing checksum {p}%','upload.dupFound':'An identical file is already on the server','upload.hashFailed':'Could not compute SHA-256, uploading without resume support…','upload.resumePct':'Resuming upload {p}%','upload.retrying':'Connection lost, retrying in {s}s ({p}% uploaded)','upload.interrupted':'Upload interrupted at {p}%. Choose the same file again to continue from there','upload.checksum':'Checksum mismatch: the file changed during the upload. Please upload it again','upload.uploading':'Uploading…','upload.pct':'Uploading {p}%','upload.failed':'Upload failed: {msg}','net.error':'Network error','text.failed':'Failed to create the share',
     'redeem.need4':'Enter the 4-digit code','redeem.cooldown':'Too many failed attempts. Try again after {t}','redeem.blacklisted':'Your IP has been blacklisted','redeem.wrong':'Wrong code ({n} failed attempts)'},
-  zh:{'index.pageTitle':'ShareWeb · 文件中转站','index.dropTitle':'拖放文件到这里','index.dropHint':'也可以点击选择，或直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴文字、图片或文件','index.pick':'选择文件','index.or':'或','index.pastePh':'文字分享直接粘贴到这里','index.textBtn':'生成文字共享','index.redeemTitle':'提取共享内容','index.redeemHint':'提取码 <b>0000</b> 获取使用方法','index.redeemBtn':'提取','index.historyTitle':'本地历史','index.clear':'清空','index.clearGone':'清除已失效','index.footer':'文件默认保留 {days} 天后自动清理 · 单文件上限 {size}','index.footerNoLimit':'文件默认保留 {days} 天后自动清理 · 单文件大小不限','upload.tooLarge':'文件超过单文件上限 {size}','upload.noSpace':'服务器磁盘空间不足',
+  zh:{'index.pageTitle':'ShareWeb · 文件中转站','tab.upload':'上传','tab.download':'下载','index.dropHintTouch':'照片、视频或任意文件','index.dropTitle':'拖放文件到这里','index.dropHint':'也可以点击选择，或直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴文字、图片或文件','index.pick':'选择文件','index.or':'或','index.pastePh':'文字分享直接粘贴到这里','index.textBtn':'生成文字共享','index.redeemTitle':'提取共享内容','index.redeemHint':'提取码 <b>0000</b> 获取使用方法','index.redeemBtn':'提取','index.historyTitle':'本地历史','index.clear':'清空','index.clearGone':'清除已失效','index.footer':'文件默认保留 {days} 天后自动清理 · 单文件上限 {size}','index.footerNoLimit':'文件默认保留 {days} 天后自动清理 · 单文件大小不限','upload.tooLarge':'文件超过单文件上限 {size}','upload.noSpace':'服务器磁盘空间不足',
     'history.empty':'暂无记录','history.untitled':'共享内容','history.sender':'发送者','history.code':'提取码','history.text':'文字','history.deleted':'已删除','history.expired':'已过期','history.goneTip':'该分享已不在服务器上','history.noneGone':'没有已失效的记录','history.confirm':'确认','history.confirmAllTip':'再点一次删除本浏览器中的全部 {n} 条记录（不影响服务器上的文件），点击其他地方取消。','history.confirmGoneTip':'再点一次删除 {n} 条已删除或已过期的记录，点击其他地方取消。',
     'result.duplicate':'服务器已有相同文件 ✓','result.done':'上传完成 ✓','result.validUntil':'有效至 {d}','result.code':'共享码','result.link':'分享链接','result.clickToCopy':'点击复制','result.copyFailed':'复制失败，请手动复制',
     'upload.hashing':'正在计算 SHA-256…','upload.hashPct':'计算校验码 {p}%','upload.dupFound':'发现服务器已有相同文件','upload.hashFailed':'无法计算 SHA-256，改为普通上传（不支持断点续传）…','upload.resumePct':'断点续传 {p}%','upload.retrying':'网络中断，{s} 秒后重试（已上传 {p}%）','upload.interrupted':'上传中断（已上传 {p}%），重新选择同一个文件即可从断点继续','upload.checksum':'校验失败：文件在上传过程中被修改，请重新上传','upload.uploading':'上传中…','upload.pct':'上传 {p}%','upload.failed':'上传失败：{msg}','net.error':'网络错误','text.failed':'生成失败',
@@ -112,6 +112,25 @@ codeInputs.forEach((el,i)=>{
   el.addEventListener('paste',e=>{e.preventDefault();const t=(e.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,4);t.split('').forEach((c,j)=>{if(codeInputs[j])codeInputs[j].value=c});if(t)focusBox(Math.min(t.length,lastBox));if(t.length===4)redeemCode()});
 });
 $('#redeemBtn').onclick=redeemCode;
+
+// ---- 上传 / 下载切换 (记住上次用的是哪个) ----
+const modeTabs=[...document.querySelectorAll('#modeSwitch [role=tab]')];
+function setMode(mode,{focus=false}={}){
+  for(const el of [$('#modeSwitch'),$('.mode-stage'),$('#mainCard')])el.dataset.mode=mode;
+  modeTabs.forEach(b=>{const on=b.dataset.mode===mode;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1});
+  $('#panelUpload').inert=mode!=='upload';$('#panelDownload').inert=mode!=='download';
+  try{localStorage.setItem('shareweb.mode',mode)}catch(e){}
+  // 切到下载时把光标放进第一个空格子 (只在电脑上; 手机上自动弹出键盘反而打扰)
+  if(focus&&mode==='download'&&matchMedia('(hover: hover) and (pointer: fine)').matches)focusBox(Math.max(0,codeInputs.findIndex(x=>!x.value)))
+}
+modeTabs.forEach(b=>{
+  b.onclick=()=>setMode(b.dataset.mode,{focus:true});
+  b.onkeydown=e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();const next=modeTabs[e.key==='ArrowRight'?1:0];setMode(next.dataset.mode);next.focus()};
+});
+setMode((()=>{try{return localStorage.getItem('shareweb.mode')}catch(e){return null}})()==='download'?'download':'upload');
+requestAnimationFrame(()=>requestAnimationFrame(()=>$('#mainCard').classList.remove('mode-init')));
+// 在下载页拖文件进来: 切回上传, 让文件能放到上传区
+document.addEventListener('dragenter',e=>{if([...(e.dataTransfer?.types||[])].includes('Files'))setMode('upload')});
 pick.onclick=()=>input.click();input.onchange=()=>{upload(input.files[0]);input.value=''};drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');upload(e.dataTransfer.files[0])};document.addEventListener('paste',onPaste);textBtn.onclick=async()=>{const text=paste.value;if(!text.trim())return;const res=await fetch('/api/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const data=await res.json();if(!res.ok){alert(data.detail||t('text.failed'));return}data.type='text';await showResult(data);paste.value=''};// 清除按钮两步确认: 第一次点击变成高亮的「确认」, 再点才执行; 点击其他地方 / Esc / 焦点移走 / 3 秒无操作即取消 (鼠标停在按钮上时暂停计时)。
 let armedBtn=null,armTimer=0;const ARM_TIMEOUT=3000;
 // 只有真正有鼠标悬停的设备才在悬停时暂停计时 (触屏点按后 :hover 会一直粘着)
@@ -153,6 +172,6 @@ function onPaste(e){
   const cd=e.clipboardData,txt=cd.getData('text/plain'),file=pastedFile(cd);
   // Word / Excel 等复制文字时会同时附带一张同内容的截图, 有文字时以文字为准; 有真实文件名的文件仍按文件上传
   const textWins=txt&&file&&file.name.startsWith('paste-');
-  if(file&&!textWins){e.preventDefault();upload(file);$('#progressWrap').scrollIntoView({block:'nearest',behavior:'smooth'});return}
-  if(txt){e.preventDefault();paste.value=txt;paste.focus();paste.scrollIntoView({block:'center',behavior:'smooth'})}
+  if(file&&!textWins){e.preventDefault();setMode('upload');upload(file);$('#progressWrap').scrollIntoView({block:'nearest',behavior:'smooth'});return}
+  if(txt){e.preventDefault();setMode('upload');paste.value=txt;paste.focus();paste.scrollIntoView({block:'center',behavior:'smooth'})}
 }

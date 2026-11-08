@@ -13,6 +13,8 @@
   --radius:18px;
   /* 提取码四个框: 单框宽/高、字号、间距; 首页按钮宽度与四个框总宽一致 */
   --code-box-w:72px; --code-box-h:96px; --code-font:64px; --code-gap:12px;
+  /* 上传/下载切换开关的滑块 */
+  --switch-thumb:#ffffff;
   color-scheme:light;
 }
 /* 暗色: 跟随系统, 除非用户手动选了亮色; 手动选暗色时无论系统如何都生效 */
@@ -29,6 +31,7 @@
     --danger:#f87171; --danger-soft:#3a1a1a;
     --field:#0f1420; --field-border:#2b3348;
     --shadow:0 14px 40px rgba(0,0,0,.4);
+    --switch-thumb:#2a3146;
     color-scheme:dark;
   }
 }
@@ -43,6 +46,7 @@
   --danger:#f87171; --danger-soft:#3a1a1a;
   --field:#0f1420; --field-border:#2b3348;
   --shadow:0 14px 40px rgba(0,0,0,.4);
+  --switch-thumb:#2a3146;
   color-scheme:dark;
 }
 /* 提取码数字字体: Tilt Neon (SIL OFL), 自托管, 仅含 0-9 子集 (约 2KB) */
@@ -97,10 +101,41 @@ header.topbar{margin-bottom:20px}
 .muted{color:var(--muted)}
 .faint{color:var(--faint)}
 .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:24px;margin-bottom:18px;box-shadow:var(--shadow)}
-.dropzone{border:2px dashed var(--field-border);border-radius:16px;padding:44px 20px;text-align:center;cursor:pointer;transition:.18s ease;background:color-mix(in srgb,var(--accent) 3%,transparent)}
+.dropzone{border:2px dashed var(--field-border);border-radius:16px;padding:36px 20px;text-align:center;cursor:pointer;transition:.18s ease;background:color-mix(in srgb,var(--accent) 3%,transparent)}
 .dropzone:hover{border-color:var(--accent)}
 .dropzone.drag{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005)}
 .drop-icon{font-size:40px;line-height:1}
+.drop-title{margin:0 0 4px}
+.drop-hint-touch{display:none}
+/* 首页: 上传 / 下载切换。滑块与两个面板一起滑动; 两个面板叠在同一个网格单元里, 高度总是一致 */
+.mode-switch{position:relative;display:grid;grid-template-columns:1fr 1fr;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:0 auto 20px;padding:4px;border-radius:999px;background:color-mix(in srgb,var(--muted) 15%,transparent)}
+.mode-switch button{position:relative;z-index:1;border:0;background:none;padding:9px 0;border-radius:999px;font-weight:600;color:var(--muted);cursor:pointer;transition:color .3s ease}
+.mode-switch button:hover{color:var(--text)}
+.mode-switch button[aria-selected="true"]{color:var(--text)}
+.mode-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mode-thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--switch-thumb);box-shadow:0 1px 2px rgba(0,0,0,.08),0 3px 10px rgba(20,30,55,.12);transition:transform .42s cubic-bezier(.34,1.32,.52,1)}
+.mode-switch[data-mode="download"] .mode-thumb{transform:translateX(100%)}
+/* 横向裁掉滑出去的面板, 纵向不裁 (按钮的悬停上浮和焦点框不会被切掉) */
+.mode-stage{display:grid;overflow-x:clip;overflow-clip-margin:6px}
+.mode-panel{grid-area:1/1;min-width:0;transition:transform .42s cubic-bezier(.2,.8,.2,1),opacity .3s ease,visibility 0s}
+/* 下载面板与上传面板等高; 用和上传区一样的浅色底框住, 留白显得是有意的 */
+#panelDownload{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:20px 14px;border-radius:16px;background:color-mix(in srgb,var(--accent) 3%,transparent);border:2px solid color-mix(in srgb,var(--field-border) 55%,transparent)}
+.mode-stage[data-mode="upload"] #panelDownload{transform:translateX(24%);opacity:0;visibility:hidden;transition:transform .42s cubic-bezier(.2,.8,.2,1),opacity .24s ease,visibility 0s .42s}
+.mode-stage[data-mode="download"] #panelUpload{transform:translateX(-24%);opacity:0;visibility:hidden;transition:transform .42s cubic-bezier(.2,.8,.2,1),opacity .24s ease,visibility 0s .42s}
+.redeem-title{margin:0 0 18px}
+.redeem-hint{margin:14px 0 0}
+#mainCard[data-mode="download"] #progressWrap,#mainCard[data-mode="download"] #result{display:none}
+/* 打开页面时直接显示上次的面板, 不播放切换动画 */
+.mode-init .mode-thumb,.mode-init .mode-panel{transition:none!important}
+@media (prefers-reduced-motion:reduce){.mode-thumb,.mode-panel,.mode-stage .mode-panel{transition:none!important}}
+/* 触屏设备拖不了文件: 去掉「拖放到这里」和快捷键说明, 上传区更紧凑 */
+@media (hover:none) and (pointer:coarse){
+  .drop-title,.drop-hint{display:none}
+  .drop-hint-touch{display:block;margin:0}
+  .mode-panel .dropzone{padding:20px 14px}
+  .mode-panel .dropzone .narrow-btn{margin-top:12px}
+  .textpaste{min-height:96px}
+}
 button,.button{font:inherit}
 .primary,.button{border:0;border-radius:12px;background:var(--dark);color:#fff;padding:12px 18px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:6px;transition:.15s ease}
 .primary:hover,.button:hover{background:var(--dark-press);transform:translateY(-1px)}
@@ -113,7 +148,7 @@ button,.button{font:inherit}
 .divider{text-align:center;color:var(--faint);margin:16px 0;position:relative}
 .divider::before,.divider::after{content:"";position:absolute;top:50%;width:42%;height:1px;background:var(--card-border)}
 .divider::before{left:0}.divider::after{right:0}
-.textpaste{width:100%;min-height:150px;resize:vertical;border:1px solid var(--field-border);border-radius:12px;padding:13px;font:inherit;background:var(--field);color:var(--text)}
+.textpaste{width:100%;min-height:120px;resize:vertical;border:1px solid var(--field-border);border-radius:12px;padding:13px;font:inherit;background:var(--field);color:var(--text)}
 .textpaste:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);border-color:var(--accent)}
 .hidden{display:none!important}
 .row{display:flex;gap:10px;align-items:center}

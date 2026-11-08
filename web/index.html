@@ -7,7 +7,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="stylesheet" href="/static/css/app.css?v=20261108-1">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261108-2">
   <script src="/static/js/prefs.js?v=20261022-2"></script>
 </head>
 <body>
@@ -23,37 +23,44 @@
       <div class="prefs" data-prefs></div>
     </header>
 
-    <section class="card">
-      <div id="dropzone" class="dropzone">
-        <div class="drop-icon">↥</div>
-        <h2 style="margin:12px 0 4px" data-i18n="index.dropTitle">Drop a file here</h2>
-        <p class="muted" data-i18n-html="index.dropHint">Or click to choose one, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste text</p>
-        <input id="fileInput" type="file" hidden>
-        <button id="pickBtn" class="primary accent narrow-btn" data-i18n="index.pick">Choose file</button>
+    <!-- 上传 / 下载两个面板叠放在同一格里 (见 .mode-stage), 卡片高度取两者中较高的, 切换时页面布局不变 -->
+    <section class="card mode-init" id="mainCard" data-mode="upload">
+      <div class="mode-switch" id="modeSwitch" role="tablist" data-mode="upload">
+        <span class="mode-thumb" aria-hidden="true"></span>
+        <button type="button" role="tab" id="tabUpload" data-mode="upload" aria-controls="panelUpload" aria-selected="true" data-i18n="tab.upload">Upload</button>
+        <button type="button" role="tab" id="tabDownload" data-mode="download" aria-controls="panelDownload" aria-selected="false" tabindex="-1" data-i18n="tab.download">Download</button>
       </div>
-      <div class="divider" data-i18n="index.or">or</div>
-      <textarea id="pasteArea" class="textpaste" placeholder="Paste text here to share it" data-i18n-placeholder="index.pastePh"></textarea>
-      <button id="textShareBtn" class="primary narrow-btn" data-i18n="index.textBtn">Create text share</button>
+      <div class="mode-stage" data-mode="upload">
+        <div class="mode-panel" id="panelUpload" role="tabpanel" aria-labelledby="tabUpload">
+          <div id="dropzone" class="dropzone">
+            <h2 class="drop-title" data-i18n="index.dropTitle">Drop a file here</h2>
+            <p class="muted drop-hint" data-i18n-html="index.dropHint">Or click to choose one, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste text</p>
+            <p class="muted drop-hint-touch" data-i18n="index.dropHintTouch">Photos, videos or any other file</p>
+            <input id="fileInput" type="file" hidden>
+            <button id="pickBtn" class="primary accent narrow-btn" data-i18n="index.pick">Choose file</button>
+          </div>
+          <div class="divider" data-i18n="index.or">or</div>
+          <textarea id="pasteArea" class="textpaste" placeholder="Paste text here to share it" data-i18n-placeholder="index.pastePh"></textarea>
+          <button id="textShareBtn" class="primary narrow-btn" data-i18n="index.textBtn">Create text share</button>
+        </div>
+        <div class="mode-panel" id="panelDownload" role="tabpanel" aria-labelledby="tabDownload">
+          <h2 class="redeem-title" data-i18n="index.redeemTitle">Retrieve a share</h2>
+          <div class="code-inputs" id="codeInputs">
+            <input maxlength="1" inputmode="numeric" autocomplete="one-time-code" aria-label="1">
+            <input maxlength="1" inputmode="numeric" aria-label="2">
+            <input maxlength="1" inputmode="numeric" aria-label="3">
+            <input maxlength="1" inputmode="numeric" aria-label="4">
+          </div>
+          <button id="redeemBtn" class="primary accent narrow-btn" data-i18n="index.redeemBtn">Retrieve</button>
+          <div id="redeemMsg" class="error"></div>
+          <p class="meta redeem-hint" data-i18n-html="index.redeemHint">Enter code <b>0000</b> for instructions</p>
+        </div>
+      </div>
       <div id="progressWrap" class="hidden">
         <div class="progress"><span id="progressBar"></span></div>
         <div id="progressText" class="muted" style="margin-top:8px;font-size:13px"></div>
       </div>
       <div id="result" class="hidden"></div>
-    </section>
-
-    <section class="card">
-      <div class="row between" style="margin-bottom:14px">
-        <h2 style="margin:0" data-i18n="index.redeemTitle">Retrieve a share</h2>
-        <span class="meta" data-i18n-html="index.redeemHint">Enter code <b>0000</b> for instructions</span>
-      </div>
-      <div class="code-inputs" id="codeInputs">
-        <input maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-        <input maxlength="1" inputmode="numeric">
-        <input maxlength="1" inputmode="numeric">
-        <input maxlength="1" inputmode="numeric">
-      </div>
-      <button id="redeemBtn" class="primary accent narrow-btn" data-i18n="index.redeemBtn">Retrieve</button>
-      <div id="redeemMsg" class="error"></div>
     </section>
 
     <section class="card">
@@ -71,6 +78,6 @@
     <p class="center faint" style="font-size:12px" data-i18n="index.footer" data-i18n-args='{"days":30,"size":"1 GB"}'>Files are deleted automatically after 30 days · Max file size 1 GB</p>
   </main>
   <script src="/static/js/sha256.js?v=20261017-4"></script>
-  <script src="/static/js/app.js?v=20261108-1"></script>
+  <script src="/static/js/app.js?v=20261108-2"></script>
 </body>
 </html>
