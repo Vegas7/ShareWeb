@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     cooldown_until TEXT,
     last_fail_at TEXT
 );
+-- 管理员密码输错的次数 (登录和修改密码共用), 见 security.record_admin_failure
+CREATE TABLE IF NOT EXISTS admin_login_fails (
+    ip TEXT PRIMARY KEY,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    last_fail_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS admin_sessions (
     token TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,

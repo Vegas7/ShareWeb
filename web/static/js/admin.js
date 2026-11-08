@@ -36,7 +36,7 @@ I18N.add({
     'admin.navOverview': 'Overview', 'admin.navFiles': 'Files', 'admin.navSecurity': 'Security', 'admin.navAdvanced': 'Advanced', 'admin.navPassword': 'Password',
     'admin.pwTitle': 'Change admin password', 'admin.pwCurrent': 'Current password', 'admin.pwNew': 'New password', 'admin.pwConfirm': 'Confirm new password', 'admin.pwSave': 'Change password',
     'admin.pwFromEnv': 'Currently using SHAREWEB_ADMIN_PASSWORD from .env. Once changed here, the new password replaces it.', 'admin.pwChanged': 'The password has been changed here, so SHAREWEB_ADMIN_PASSWORD in .env no longer works. If you forget it, see "Forgot the admin password" in the README.', 'admin.pwSignOut': 'Changing it signs out every other device.',
-    'admin.pwNeedCurrent': 'Enter the current password', 'admin.pwTooShort': 'The new password needs at least {n} characters', 'admin.pwMismatch': 'The two new passwords don\'t match', 'admin.pwSame': 'The new password is the same as the current one', 'admin.pwWrong': 'The current password is wrong', 'admin.pwDone': 'Password changed ✓', 'admin.pwDoneOthers': 'Password changed ✓ Signed out {n} other session(s)', 'admin.pwFailed': 'Failed to change the password: {msg}',
+    'admin.pwNeedCurrent': 'Enter the current password', 'admin.pwTooShort': 'The new password needs at least {n} characters', 'admin.pwMismatch': 'The two new passwords don\'t match', 'admin.pwSame': 'The new password is the same as the current one', 'admin.pwWrongLeft': 'Wrong password. {n} attempt(s) left before a temporary lockout', 'admin.pwLocked': 'Too many wrong passwords. Try again after {t}', 'admin.pwDone': 'Password changed ✓', 'admin.pwDoneOthers': 'Password changed ✓ Signed out {n} other session(s)', 'admin.pwFailed': 'Failed to change the password: {msg}',
     'admin.trendTitle': 'Uploads & downloads', 'admin.trendUploads': 'Uploads', 'admin.trendDownloads': 'Downloads',
     'admin.days7': '7 days', 'admin.days14': '14 days', 'admin.days30': '30 days', 'admin.chartFailed': 'Failed to load chart data: {msg}',
     'admin.typesTitle': 'Storage by type', 'admin.typesSub': 'Active shares, by size', 'admin.typesEmpty': 'No active shares',
@@ -99,7 +99,7 @@ I18N.add({
     'admin.navOverview': '总览', 'admin.navFiles': '文件管理', 'admin.navSecurity': '安全设置', 'admin.navAdvanced': '高级设置', 'admin.navPassword': '管理员密码',
     'admin.pwTitle': '修改管理员密码', 'admin.pwCurrent': '当前密码', 'admin.pwNew': '新密码', 'admin.pwConfirm': '确认新密码', 'admin.pwSave': '修改密码',
     'admin.pwFromEnv': '当前使用 .env 中的 SHAREWEB_ADMIN_PASSWORD。在这里修改后以新密码为准。', 'admin.pwChanged': '密码已在后台修改过，.env 中的 SHAREWEB_ADMIN_PASSWORD 不再生效。忘记密码时参见 README 中的「忘记管理员密码」。', 'admin.pwSignOut': '修改后，其他设备上的登录会全部退出。',
-    'admin.pwNeedCurrent': '请输入当前密码', 'admin.pwTooShort': '新密码至少需要 {n} 个字符', 'admin.pwMismatch': '两次输入的新密码不一致', 'admin.pwSame': '新密码与当前密码相同', 'admin.pwWrong': '当前密码不正确', 'admin.pwDone': '密码已修改 ✓', 'admin.pwDoneOthers': '密码已修改 ✓ 已退出其他 {n} 处登录', 'admin.pwFailed': '修改失败：{msg}',
+    'admin.pwNeedCurrent': '请输入当前密码', 'admin.pwTooShort': '新密码至少需要 {n} 个字符', 'admin.pwMismatch': '两次输入的新密码不一致', 'admin.pwSame': '新密码与当前密码相同', 'admin.pwWrongLeft': '密码错误，再错 {n} 次将暂时锁定', 'admin.pwLocked': '密码错误次数过多，请于 {t} 后再试', 'admin.pwDone': '密码已修改 ✓', 'admin.pwDoneOthers': '密码已修改 ✓ 已退出其他 {n} 处登录', 'admin.pwFailed': '修改失败：{msg}',
     'admin.trendTitle': '上传与下载', 'admin.trendUploads': '上传', 'admin.trendDownloads': '下载',
     'admin.days7': '7 天', 'admin.days14': '14 天', 'admin.days30': '30 天', 'admin.chartFailed': '图表数据加载失败：{msg}',
     'admin.typesTitle': '按类型的存储占用', 'admin.typesSub': '当前有效的共享，按占用大小', 'admin.typesEmpty': '暂无有效共享',
@@ -472,13 +472,25 @@ async function checkAuth() {
   }
 }
 
+// 密码输错 / 次数过多被锁定时的提示 (登录和修改密码共用)
+function pwFailKey(r, d) {
+  if (r.status === 429) return ['admin.pwLocked', { t: { date: d.locked_until } }];
+  if (d.remaining) return ['admin.pwWrongLeft', { n: d.remaining }];
+  return null;
+}
 $('#login').onclick = async () => {
   setKey($('#loginErr'), null);
   try {
-    await api('/api/admin/login', { password: $('#adminPw').value });
+    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('#adminPw').value }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const [key, args] = pwFailKey(r, d) || ['admin.loginFailed'];
+      setKey($('#loginErr'), key, args);
+      $('#adminPw').select();
+      return;
+    }
   } catch (e) {
-    if (e.i18nKey || !e.message) setKey($('#loginErr'), e.i18nKey || 'admin.loginFailed');
-    else { setKey($('#loginErr'), null); $('#loginErr').textContent = e.message; }
+    setKey($('#loginErr'), 'admin.loginFailed');
     return;
   }
   showPanel(true);
@@ -855,7 +867,8 @@ $('#pwForm').addEventListener('submit', async e => {
   try {
     const r = await fetch('/api/admin/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current, new: pw }) });
     const d = await r.json().catch(() => ({}));
-    if (r.status === 403) { pwMsg('admin.pwWrong'); $('#pwCurrent').select(); return; }
+    const fail = (r.status === 403 || r.status === 429) && pwFailKey(r, d);
+    if (fail) { pwMsg(...fail); $('#pwCurrent').select(); return; }
     if (!r.ok) { pwMsg('admin.pwFailed', { msg: d.detail || r.status }); return; }
     $('#pwForm').reset();
     if (d.signed_out) pwMsg('admin.pwDoneOthers', { n: d.signed_out }, true); else pwMsg('admin.pwDone', null, true);

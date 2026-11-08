@@ -17,7 +17,7 @@
   - 文件管理：排序、批量删除、锁定（锁定的文件不过期、不会被清理）
   - 安全设置：访客 IP 列表（含国家与运营商），封禁 / 解封
   - 高级设置：单文件大小上限（500 MB / 1 GB / 4 GB / 不限 / 自定义），磁盘不足时自动删除最旧的文件
-  - 管理员密码：在后台修改，修改后其他设备上的登录自动退出
+  - 管理员密码：在后台修改，修改后其他设备上的登录自动退出；同一 IP 连续输错 5 次锁定 15 分钟，之后每次翻倍（最长 24 小时）
 - 中文 / English 界面，亮色 / 暗色主题。
 
 ## 目录结构
@@ -65,6 +65,14 @@ sudo systemctl restart shareweb
 **更新**：`git pull` 后再执行一次 `sudo bash deploy/install.sh`。`.env`、数据库和已存文件不会被覆盖。
 
 运行时数据都在 `/opt/shareweb` 下：`data/`（已存文件）、`database/share.db`、`logs/`、`geoip/`。
+
+### 管理员登录被锁定
+
+同一 IP 连续输错 5 次管理员密码会被暂时锁定（登录和修改密码共用这个计数）。等不及时可以手动解锁：
+
+```bash
+sudo -u shareweb /opt/shareweb/venv/bin/python -c "import sqlite3; c = sqlite3.connect('/opt/shareweb/database/share.db'); c.execute('DELETE FROM admin_login_fails'); c.commit()"
+```
 
 ### 忘记管理员密码
 

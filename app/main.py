@@ -20,7 +20,8 @@ from .config import settings
 from .database import init_db, connect
 from .deps import client_ip, ensure_not_blacklisted
 from .logging_config import setup_logging
-from .security import utcnow, iso, require_admin_session
+from .security import (utcnow, iso, require_admin_session, admin_locked_until, record_admin_failure,
+                       clear_admin_failures)
 from .services import (SPECIAL_CODE, RedeemBlocked, cleanup_expired, cleanup_old_files, create_share_file, create_share_text,
                        delete_files, evict_for_space, evictable_files, get_active_file_by_sha256, get_github_download_url,
                        get_share_by_token, list_files, log_event, mirror_to_github, redeem_code, set_files_locked, share_status,
@@ -421,16 +422,34 @@ async def download(token: str, request: Request, enc: int = 0, inline: int = 0):
         headers={"Cache-Control": "private, no-store"},
     )
 
+async def _check_admin_password(ip: str, password: str, action: str, request: Request) -> JSONResponse | None:
+    """核对管理员密码。输错 / 已被锁定时返回要直接回给客户端的响应 (401 附剩余次数, 或 429 附解锁时间); 正确时返回 None。
+
+    输错次数按 IP 计 (见 security.record_admin_failure), 锁定期间不再核对密码。
+    """
+    ua = request.headers.get("user-agent", "-")
+    if until := await run_in_threadpool(admin_locked_until, ip):
+        log_event(ip, action, "LOCKED", detail=f"UNTIL={until}", user_agent=ua, level=logging.WARNING)
+        return JSONResponse({"detail": "too many failed attempts", "locked_until": until}, status_code=429)
+    if await run_in_threadpool(app_settings.check_admin_password, password):
+        return None
+    remaining, until = await run_in_threadpool(record_admin_failure, ip)
+    log_event(ip, action, "FAIL", detail="BAD_PASSWORD" + (f" LOCKED_UNTIL={until}" if until else ""), user_agent=ua, level=logging.WARNING)
+    if until:
+        return JSONResponse({"detail": "too many failed attempts", "locked_until": until}, status_code=429)
+    return JSONResponse({"detail": "invalid password", "remaining": remaining},
+                        status_code=403 if action == "ADMIN_PASSWORD" else 401)
+
 @app.post("/api/admin/login")
 async def admin_login(request: Request, payload: AdminLoginRequest):
     ip = client_ip(request)
-    if not await run_in_threadpool(app_settings.check_admin_password, payload.password):
-        log_event(ip, "ADMIN_LOGIN", "FAIL", detail="BAD_PASSWORD", user_agent=request.headers.get("user-agent","-"), level=logging.WARNING)
-        raise HTTPException(401, "invalid password")
+    if failed := await _check_admin_password(ip, payload.password, "ADMIN_LOGIN", request):
+        return failed
     token = secrets.token_urlsafe(32)
     now = utcnow(); exp = now + timedelta(hours=settings.admin_session_hours)
     with connect() as conn:
         conn.execute("INSERT INTO admin_sessions(token,created_at,expires_at) VALUES(?,?,?)", (token, iso(now), iso(exp)))
+    await run_in_threadpool(clear_admin_failures, ip)
     log_event(ip, "ADMIN_LOGIN", "SUCCESS", detail="", user_agent=request.headers.get("user-agent","-"))
     resp = JSONResponse({"ok": True})
     resp.set_cookie("shareweb_admin", token, httponly=True, secure=True, samesite="strict", max_age=settings.admin_session_hours*3600, path="/")
@@ -586,9 +605,9 @@ async def admin_change_password(request: Request, payload: AdminPasswordRequest,
                                 shareweb_admin: str | None = Cookie(default=None)):
     """修改管理员密码 (要求输入当前密码); 成功后其他设备上的登录全部失效, 当前这个保留。"""
     ip = client_ip(request)
-    if not await run_in_threadpool(app_settings.check_admin_password, payload.current):
-        log_event(ip, "ADMIN_PASSWORD", "FAIL", detail="BAD_CURRENT_PASSWORD", user_agent=request.headers.get("user-agent","-"), level=logging.WARNING)
-        raise HTTPException(403, "wrong current password")
+    if failed := await _check_admin_password(ip, payload.current, "ADMIN_PASSWORD", request):
+        return failed
+    await run_in_threadpool(clear_admin_failures, ip)
     await run_in_threadpool(app_settings.set_admin_password, payload.new)
     with connect() as conn:
         ended = conn.execute("DELETE FROM admin_sessions WHERE token<>?", (shareweb_admin or "",)).rowcount

@@ -52,6 +52,41 @@ def clear_failed_attempts(ip: str):
     with connect() as conn:
         conn.execute("DELETE FROM rate_limits WHERE ip=?", (ip,))
 
+# ---- 管理员密码输错限制 (按 IP) ----
+# 每输错 ADMIN_FAIL_LIMIT 次锁定一段时间, 第一次 15 分钟, 之后每次翻倍, 最长 24 小时;
+# 24 小时内没有再输错则从头计数, 输对即清零。只锁这个 IP 的登录 / 改密码, 不拉黑整站访问。
+ADMIN_FAIL_LIMIT = 5
+_ADMIN_LOCK_FIRST = timedelta(minutes=15)
+_ADMIN_LOCK_MAX = timedelta(hours=24)
+_ADMIN_FAIL_RESET = timedelta(hours=24)
+
+def admin_locked_until(ip: str) -> str | None:
+    """该 IP 被锁定时返回解锁时间 (ISO), 否则 None。"""
+    with connect() as conn:
+        row = conn.execute("SELECT locked_until FROM admin_login_fails WHERE ip=?", (ip,)).fetchone()
+    until = row["locked_until"] if row else None
+    return until if until and until > iso(utcnow()) else None
+
+def record_admin_failure(ip: str) -> tuple[int, str | None]:
+    """记一次输错, 返回 (锁定前还能再试几次, 锁定到何时 / None)。"""
+    now = utcnow()
+    with connect() as conn:
+        row = conn.execute("SELECT fail_count, last_fail_at FROM admin_login_fails WHERE ip=?", (ip,)).fetchone()
+        count = row["fail_count"] if row and row["last_fail_at"] > iso(now - _ADMIN_FAIL_RESET) else 0
+        count += 1
+        locked_until = None
+        if count % ADMIN_FAIL_LIMIT == 0:
+            locks = count // ADMIN_FAIL_LIMIT
+            locked_until = iso(now + min(_ADMIN_LOCK_FIRST * 2 ** (locks - 1), _ADMIN_LOCK_MAX))
+        conn.execute("INSERT INTO admin_login_fails(ip,fail_count,locked_until,last_fail_at) VALUES(?,?,?,?) "
+                     "ON CONFLICT(ip) DO UPDATE SET fail_count=excluded.fail_count, locked_until=excluded.locked_until, "
+                     "last_fail_at=excluded.last_fail_at", (ip, count, locked_until, iso(now)))
+    return ADMIN_FAIL_LIMIT - count % ADMIN_FAIL_LIMIT, locked_until
+
+def clear_admin_failures(ip: str):
+    with connect() as conn:
+        conn.execute("DELETE FROM admin_login_fails WHERE ip=?", (ip,))
+
 def require_admin_session(token: str | None) -> bool:
     if not token:
         return False
