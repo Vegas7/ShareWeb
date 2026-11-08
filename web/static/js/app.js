@@ -18,11 +18,29 @@ function updateHistoryButtons(){const g=$('#clearGone');g.disabled=historyGone.s
 // 列表在卡片里滚动; 上 / 下方还有内容时给对应边缘加渐隐
 const historyBox=$('#history');
 function updateHistoryFade(){const h=historyBox;h.classList.toggle('more-above',h.scrollTop>1);h.classList.toggle('more-below',h.scrollTop+h.clientHeight<h.scrollHeight-1)}
-historyBox.addEventListener('scroll',updateHistoryFade,{passive:true});addEventListener('resize',updateHistoryFade);
-async function renderHistory(){const box=$('#history');const items=await getHistory();historyGone=new Map();historyCount=items.length;updateHistoryButtons();if(!items.length){box.innerHTML=`<p class="muted">${S('history.empty')}</p>`;updateHistoryFade();return}box.innerHTML=items.map(x=>{
-  if(x.role==='sender') return `<div class="history-item" data-token="${esc(x.token||'')}"><div><b>${x.name||x.filename?esc(x.name||x.filename):S('history.untitled')}</b><span class="history-status"></span><div class="meta">${S('history.sender')} · ${D(x.added_at)}</div></div><div class="sender-history"><div class="copy-inline"><span class="meta">${S('history.code')}</span><button type="button" class="copy-box history-code-box" data-copy="${esc(x.code||'')}">${esc(x.code||'')}</button><span class="copy-hint" data-i18n="result.clickToCopy">${esc(t('result.clickToCopy'))}</span></div><div class="copy-inline"><button type="button" class="copy-box history-link-box" data-copy="${esc(x.url||'')}">${esc(x.url||'')}</button><span class="copy-hint" data-i18n="result.clickToCopy">${esc(t('result.clickToCopy'))}</span></div></div></div>`;
-  return `<div class="history-item" data-token="${esc(x.token||'')}"><a class="history-link" href="/share/${encodeURIComponent(x.token)}">${x.name||x.filename?esc(x.name||x.filename):S('history.untitled')}</a><span class="history-status"></span><div class="meta">${x.type==='file'?esc(fmtSize(x.size)):S('history.text')} · ${D(x.added_at)}</div></div>`;
-}).join('');box.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyWithFeedback(b));updateHistoryFade();markHistoryStatus(items)}
+historyBox.addEventListener('scroll',updateHistoryFade,{passive:true});
+// 列表高度: 尽量让整页一屏显示完。两栏时与左边卡片底部对齐; 单栏时占满屏幕剩下的高度, 但至少留约两条记录的高度。
+// 屏幕高度用 100svh (手机浏览器地址栏收起/展开时不变, 列表不会跟着滚动忽高忽低)
+const HISTORY_MIN=110,svhProbe=document.createElement('div');
+svhProbe.style.cssText='position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none';document.body.appendChild(svhProbe);
+function fitHistory(){
+  const h=historyBox,card=h.closest('.card'),main=$('main.container'),cs=getComputedStyle(card),ms=getComputedStyle(main);
+  const below=parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth);
+  let avail;
+  if(getComputedStyle($('.home-grid')).display==='grid')avail=$('#mainCard').getBoundingClientRect().bottom-h.getBoundingClientRect().top-below;
+  else avail=(svhProbe.offsetHeight||innerHeight)-(main.offsetHeight+parseFloat(ms.marginTop)+parseFloat(ms.marginBottom)-h.offsetHeight);
+  h.style.maxHeight=Math.max(HISTORY_MIN,Math.floor(avail))+'px';
+  updateHistoryFade();
+}
+addEventListener('resize',fitHistory);
+// 上传进度 / 结果出现等让左边卡片变高时也重新算
+if(window.ResizeObserver)new ResizeObserver(()=>fitHistory()).observe($('#mainCard'));
+document.fonts?.ready.then(fitHistory);
+async function renderHistory(){const box=$('#history');const items=await getHistory();historyGone=new Map();historyCount=items.length;updateHistoryButtons();if(!items.length){box.innerHTML=`<p class="muted">${S('history.empty')}</p>`;fitHistory();return}box.innerHTML=items.map(x=>{
+  const name=x.name||x.filename?esc(x.name||x.filename):S('history.untitled');
+  if(x.role==='sender') return `<div class="history-item" data-token="${esc(x.token||'')}"><div class="history-line"><b class="history-name" title="${esc(x.name||x.filename||'')}">${name}</b><span class="history-status"></span><span class="meta history-meta">${S('history.sender')} · ${D(x.added_at)}</span></div><div class="sender-history"><div class="copy-inline"><button type="button" class="copy-box history-code-box" data-copy="${esc(x.code||'')}" data-i18n-title="result.clickToCopy" title="${esc(t('result.clickToCopy'))}">${esc(x.code||'')}</button><span class="copy-hint" data-i18n="result.clickToCopy">${esc(t('result.clickToCopy'))}</span></div><div class="copy-inline history-url-line"><button type="button" class="copy-box history-link-box" title="${esc(x.url||'')}" data-copy="${esc(x.url||'')}">${esc(x.url||'')}</button><span class="copy-hint" data-i18n="result.clickToCopy">${esc(t('result.clickToCopy'))}</span></div></div></div>`;
+  return `<div class="history-item" data-token="${esc(x.token||'')}"><div class="history-line"><a class="history-link history-name" title="${esc(x.name||x.filename||'')}" href="/share/${encodeURIComponent(x.token)}">${name}</a><span class="history-status"></span><span class="meta history-meta">${x.type==='file'?esc(fmtSize(x.size)):S('history.text')} · ${D(x.added_at)}</span></div></div>`;
+}).join('');box.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyWithFeedback(b));fitHistory();markHistoryStatus(items)}
 // 本地历史只存在本机浏览器里, 服务器删文件不会影响它; 这里向服务器查一下, 把已删除/已过期的条目标出来 (查询失败则保持原样)。
 async function markHistoryStatus(items){const tokens=items.map(x=>x.token).filter(Boolean).slice(0,200);if(!tokens.length)return;try{const r=await fetch('/api/share-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tokens})});if(!r.ok)return;const {status}=await r.json();items.forEach(x=>{const s=status[x.token];if(s==='deleted'||s==='expired')historyGone.set(x.token,x.key||x.token)});updateHistoryButtons();document.querySelectorAll('#history .history-item[data-token]').forEach(el=>{const s=status[el.dataset.token];if(s!=='deleted'&&s!=='expired')return;el.classList.add('gone');el.dataset.i18nTitle='history.goneTip';el.title=t('history.goneTip');el.querySelector('.history-status').innerHTML=`<span class="tag ${s==='deleted'?'gone':'warn'}">${S(s==='deleted'?'history.deleted':'history.expired')}</span>`});updateHistoryFade()}catch(e){}}
 let lastResult=null;

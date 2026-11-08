@@ -165,7 +165,7 @@ button,.button{font:inherit}
 .narrow-btn{display:flex;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:14px auto 0}
 .code-inputs input{width:100%;height:var(--code-box-h);padding:0;text-align:center;font-family:"Tilt Neon",system-ui,sans-serif;font-size:var(--code-font);font-weight:400;border:1px solid var(--field-border);border-radius:14px;background:var(--field);color:var(--text)}
 .code-inputs input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
-.sender-history{display:grid;gap:10px;margin-top:10px}
+.sender-history{display:flex;align-items:center;gap:14px;margin-top:5px}
 /* 分享页 GitHub 直链行 (输入框 + 打开按钮) */
 .history-url{display:flex;gap:10px;align-items:center}
 .history-url .input{min-width:0}
@@ -208,13 +208,22 @@ button,.button{font:inherit}
 /* 本地历史: 同样的复制框, 但居左、紧凑 */
 .copy-inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .copy-inline .copy-hint{min-height:0}
-.history-code-box{font-family:"Tilt Neon",system-ui,sans-serif;font-size:26px;line-height:1;letter-spacing:.12em;padding:6px 10px 6px calc(10px + .12em);color:var(--accent);border-radius:10px}
+.history-code-box{font-family:"Tilt Neon",system-ui,sans-serif;font-size:20px;line-height:1;letter-spacing:.12em;padding:4px 8px 4px calc(8px + .12em);color:var(--accent);border-radius:10px}
 /* 历史里的链接: 与 SHA-256 一样透明, 悬停才出现虚线框, 框只包住文字 */
-.copy-box.history-link-box{flex:0 1 auto;min-width:0;text-align:left;padding:4px 8px;margin-left:-8px;font-size:13px;line-height:1.5;word-break:break-all;color:var(--muted);background:none;border:1px dashed transparent;border-radius:8px}
+.copy-box.history-link-box{flex:0 1 auto;min-width:0;text-align:left;padding:3px 8px;margin-left:-8px;font-size:13px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);background:none;border:1px dashed transparent;border-radius:8px}
 .copy-box.history-link-box:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
 .copy-box.history-link-box.copied{color:var(--ok);border-color:var(--ok);background:none}
 .copy{margin-left:8px}
-.history-item{padding:13px 0;border-bottom:1px solid var(--card-border)}
+.history-item{padding:9px 0;border-bottom:1px solid var(--card-border)}
+/* 每条记录一行: 名称 (过长省略) + 状态, 右侧是大小 / 时间; 发送的记录下面再一行提取码和链接 */
+.history-line{display:flex;align-items:baseline;gap:4px 10px;min-width:0}
+.history-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.history-line .history-status{flex:none}
+.history-line .history-status .tag{margin-left:0}
+.history-meta{flex:none;margin-left:auto;white-space:nowrap;font-size:12.5px}
+.history-url-line{flex:1 1 0;min-width:0;flex-wrap:nowrap}
+/* 历史里的「点击复制」提示平时不占位 (按钮上有悬停提示), 点了之后才显示「已复制」 */
+.history-item .copy-hint:not(.done):not(.fail){display:none}
 .history-item:last-child{border-bottom:0}
 /* 记录多时列表内部滚动, 不把整页撑得很长; 滚动条放进卡片右侧留白里, 列表内容仍与卡片标题对齐 */
 #history{max-height:min(560px,65vh);overflow-y:auto;margin-right:-14px;padding-right:14px;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--faint) 45%,transparent) transparent}
@@ -241,6 +250,13 @@ button,.button{font:inherit}
 .history-item.gone .history-link,.history-item.gone b{color:var(--faint);text-decoration:line-through}
 /* 已删除/已过期的条目: 提取码和链接已不可用, 不再显示, 只保留名称 + 标签 + 时间 */
 .history-item.gone .sender-history{display:none}
+/* 历史卡片较窄时 (手机, 或两栏布局里窗口不够宽) 时间换到第二行, 给文件名留出位置 */
+.history-card{container-type:inline-size}
+@container (max-width:400px){
+  .history-line{flex-wrap:wrap}
+  .history-name{flex:1 1 0}  /* 名称和状态标签留在第一行, 名称过长时省略 */
+  .history-meta{flex-basis:100%;margin-left:0}
+}
 .meta{font-size:13px;color:var(--muted)}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
 .danger{color:var(--danger)}
@@ -447,3 +463,36 @@ html.admin-page{scrollbar-gutter:stable}
 .switch input:checked + span::after{transform:translateX(20px)}
 .switch input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
 .switch input:disabled + span{opacity:.55}
+
+/* ---- 首页尽量一屏显示完 ---- */
+/* 宽屏: 左边上传 / 下载, 右边本地历史 (列表高度由 app.js 的 fitHistory 对齐到左边卡片底部) */
+@media (min-width:860px){
+  .home-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start;margin-bottom:18px}
+  .home-grid > .card{margin-bottom:0}
+  .home-grid > .history-card{align-self:stretch}
+}
+/* 屏幕较矮 (笔记本、手机): 收紧上下留白 */
+@media (max-height:820px){
+  .home .container{margin-bottom:16px}
+  .home header{margin-bottom:14px}
+  .mode-switch{margin-bottom:14px}
+  .mode-panel .dropzone{padding:20px 16px}
+  .mode-panel .divider{margin:10px 0}
+  .mode-panel .textpaste{min-height:84px}
+  .mode-panel .narrow-btn{margin-top:12px}
+  .redeem-title{margin-bottom:14px}
+}
+@media (max-height:820px) and (min-width:701px){.home .container{margin-top:20px}}
+/* 较矮的手机: 上传区再紧凑些 (去掉一行说明文字, 文字框更矮) */
+@media (max-height:820px) and (hover:none) and (pointer:coarse){
+  .drop-hint-touch{display:none}
+  .mode-panel .dropzone{padding:14px}
+  .mode-panel .dropzone .narrow-btn{margin-top:0}
+  .mode-panel .textpaste{min-height:72px;margin-top:12px}
+  .mode-panel .divider{display:none}
+  .home .container{margin-top:12px;margin-bottom:6px}
+  #panelDownload{padding:10px 14px}
+  .redeem-title{margin-bottom:10px}
+  .redeem-hint{margin-top:8px}
+}
+.home main > p.center{margin:10px 0 0}
