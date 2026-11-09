@@ -29,13 +29,18 @@ svhProbe.style.cssText='position:fixed;top:0;left:0;width:0;height:100vh;height:
 function fitHistory(){
   const z=parseFloat(getComputedStyle(document.documentElement).zoom)||1;
   const viewH=Math.min(svhProbe.getBoundingClientRect().height||innerHeight,innerHeight);
-  const grid=$('.home-grid'),h=historyBox,main=$('main.container');
-  grid.classList.remove('two-col');
+  const grid=$('.home-grid'),h=historyBox,main=$('main.container'),card=$('#mainCard');
+  grid.classList.remove('two-col','fill');card.style.minHeight='';
   const ms=getComputedStyle(main);
   let avail=viewH-(main.getBoundingClientRect().height+(parseFloat(ms.marginTop)+parseFloat(ms.marginBottom))*z-h.getBoundingClientRect().height);
   const pref=document.documentElement.dataset.layout,w=innerWidth/z;
   if(pref==='side'?w>=SIDE_MIN_W:pref!=='stack'&&w>=TWO_COL_MIN_W&&avail/z<SINGLE_COL_MIN){
     grid.classList.add('two-col');
+    // 屏幕还有富余高度时把左边卡片拉高到撑满一屏 (先把列表压到最小, 量出两栏时整页的自然高度)
+    // (按拉高后的排版量: 拖放区改成纵向 flex 后内边距不再合并, 自然高度会略有不同)
+    h.style.maxHeight=HISTORY_MIN+'px';grid.classList.add('fill');
+    const spare=viewH-(main.getBoundingClientRect().height+(parseFloat(ms.marginTop)+parseFloat(ms.marginBottom))*z);
+    if(spare>1)card.style.minHeight=Math.floor((card.getBoundingClientRect().height+spare)/z)+'px';else grid.classList.remove('fill');
     const cs=getComputedStyle(h.closest('.card'));
     avail=$('#mainCard').getBoundingClientRect().bottom-h.getBoundingClientRect().top-(parseFloat(cs.paddingBottom)+parseFloat(cs.borderBottomWidth))*z;
   }

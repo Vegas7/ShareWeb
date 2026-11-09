@@ -475,6 +475,13 @@ html.admin-page{scrollbar-gutter:stable}
 .home-grid.two-col{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start;margin-bottom:18px}
 .home-grid.two-col > .card{margin-bottom:0}
 .home-grid.two-col > .history-card{align-self:stretch}
+/* 两栏时屏幕比内容高 (如 1440p、4K 选了横向): 左边卡片拉高到撑满一屏 (高度由 fitHistory 设), 多出的高度分给拖放区和文字框,
+   下载面板随之拉高、内容居中; 右边列表跟着变长。上传进度 / 结果出现时先占用这部分空间 */
+.home-grid.fill #mainCard{display:flex;flex-direction:column}
+.home-grid.fill .mode-stage{flex:1 1 auto}
+.home-grid.fill #panelUpload{display:flex;flex-direction:column}
+.home-grid.fill #panelUpload .dropzone{flex:3 1 auto;display:flex;flex-direction:column;justify-content:center}
+.home-grid.fill #panelUpload .textpaste{flex:2 1 auto;resize:none}
 /* 屏幕不算高 (笔记本、1080p、4K 175% 缩放、手机): 收紧上下留白, 给本地历史多留些高度。
    超宽屏整页放大时 (见文件开头的 zoom: 2560px 宽放大 1.25 倍、3200px 宽放大 1.5 倍), 按放大后的高度算:
    媒体查询看的是放大前的尺寸, 所以阈值分别乘上 1.25 / 1.5 (如 1440p 100% 缩放放大后约 1040px 高) */
