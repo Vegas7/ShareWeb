@@ -16,8 +16,10 @@
   const dict = { en: {}, zh: {} };
   let lang = store.get('sw-lang') === 'zh' ? 'zh' : 'en';  // 默认英文
 
-  const savedTheme = store.get('sw-theme');
-  if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
+  // 主题: system 跟随系统 (默认) / light 亮色 / dark 暗色。跟随系统时不设 data-theme, 由 CSS 的 prefers-color-scheme 决定
+  const THEMES = ['system', 'light', 'dark'];
+  let theme = ['light', 'dark'].includes(store.get('sw-theme')) ? store.get('sw-theme') : 'system';
+  if (theme !== 'system') root.dataset.theme = theme;
   root.lang = lang === 'zh' ? 'zh-CN' : 'en';
   // 首页排版: auto 自适应 / stack 竖向 (上下) / side 横向 (左右)。由首页脚本按 <html data-layout> 排版
   const LAYOUTS = ['auto', 'stack', 'side'];
@@ -70,12 +72,12 @@
 
   function locale() { return lang === 'zh' ? 'zh-CN' : 'en-US'; }
 
-  function effectiveTheme() {
-    return root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  }
-
   const SUN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
   const MOON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1Z"/></svg>';
+  // 跟随系统: 半边实心的圆 (一半亮一半暗)
+  const AUTO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></svg>';
+  const THEME_ICON = { system: AUTO, light: SUN, dark: MOON };
+  const THEME_KEY = { system: 'prefs.themeSystem', light: 'prefs.themeLight', dark: 'prefs.themeDark' };
   // 「文A」翻译图标 (Material Icons "translate")。图标不随语言变化, 目标语言写在 title / aria-label 里。
   const TRANSLATE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>';
 
@@ -107,9 +109,9 @@
       lb.title = t('prefs.lang');
       lb.setAttribute('aria-label', t('prefs.lang'));
       const tb = slot.querySelector('[data-pref="theme"]');
-      const dark = effectiveTheme() === 'dark';
-      tb.innerHTML = dark ? SUN : MOON;
-      tb.title = t(dark ? 'prefs.toLight' : 'prefs.toDark');
+      // 图标与提示显示当前的主题设置, 点一下切到下一种
+      tb.innerHTML = THEME_ICON[theme];
+      tb.title = t('prefs.themeTitle', { mode: { key: THEME_KEY[theme] } });
       tb.setAttribute('aria-label', tb.title);
     });
   }
@@ -131,10 +133,11 @@
     document.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
   }
 
+  // 跟随系统 → 亮色 → 暗色 → 跟随系统
   function toggleTheme() {
-    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
-    root.dataset.theme = next;
-    store.set('sw-theme', next);
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    if (theme === 'system') delete root.dataset.theme; else root.dataset.theme = theme;
+    store.set('sw-theme', theme);
     renderToggles();
   }
 
@@ -161,8 +164,8 @@
   add({
     en: {
       'prefs.lang': 'Switch to Chinese',
-      'prefs.toLight': 'Switch to light theme',
-      'prefs.toDark': 'Switch to dark theme',
+      'prefs.themeTitle': 'Theme: {mode}',
+      'prefs.themeSystem': 'Follow system', 'prefs.themeLight': 'Light', 'prefs.themeDark': 'Dark',
       'prefs.layoutTitle': 'Layout: {mode}',
       'prefs.layoutAuto': 'Auto',
       'prefs.layoutStack': 'Vertical',
@@ -180,8 +183,8 @@
     },
     zh: {
       'prefs.lang': '切换到英文',
-      'prefs.toLight': '切换到亮色主题',
-      'prefs.toDark': '切换到暗色主题',
+      'prefs.themeTitle': '主题：{mode}',
+      'prefs.themeSystem': '跟随系统', 'prefs.themeLight': '亮色', 'prefs.themeDark': '暗色',
       'prefs.layoutTitle': '排版：{mode}',
       'prefs.layoutAuto': '自适应',
       'prefs.layoutStack': '竖向',
