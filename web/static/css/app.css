@@ -14,7 +14,8 @@
   /* 提取码四个框: 单框宽/高、字号、间距; 首页按钮宽度与四个框总宽一致 */
   --code-box-w:72px; --code-box-h:96px; --code-font:64px; --code-gap:12px;
   /* 上传/下载切换开关的滑块 */
-  --switch-thumb:#ffffff;
+  --switch-track:color-mix(in srgb,var(--muted) 15%,transparent); --switch-track-shadow:none;
+  --switch-thumb:#ffffff; --switch-thumb-shadow:0 1px 2px rgba(0,0,0,.08),0 3px 10px rgba(20,30,55,.12); --switch-on:var(--text);
   color-scheme:light;
 }
 /* 暗色: 跟随系统, 除非用户手动选了亮色; 手动选暗色时无论系统如何都生效 */
@@ -31,7 +32,8 @@
     --danger:#f87171; --danger-soft:#3a1a1a;
     --field:#0f1420; --field-border:#2b3348;
     --shadow:0 14px 40px rgba(0,0,0,.4);
-    --switch-thumb:#2a3146;
+    --switch-track:#0a0d14; --switch-track-shadow:inset 0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px #20273a;
+    --switch-thumb:#3b4560; --switch-thumb-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 8px rgba(0,0,0,.55); --switch-on:#fff;
     color-scheme:dark;
   }
 }
@@ -46,7 +48,8 @@
   --danger:#f87171; --danger-soft:#3a1a1a;
   --field:#0f1420; --field-border:#2b3348;
   --shadow:0 14px 40px rgba(0,0,0,.4);
-  --switch-thumb:#2a3146;
+  --switch-track:#0a0d14; --switch-track-shadow:inset 0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px #20273a;
+  --switch-thumb:#3b4560; --switch-thumb-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 8px rgba(0,0,0,.55); --switch-on:#fff;
   color-scheme:dark;
 }
 /* 提取码数字字体: Tilt Neon (SIL OFL), 自托管, 仅含 0-9 子集 (约 2KB) */
@@ -107,12 +110,12 @@ header.topbar{margin-bottom:20px}
 .drop-title{margin:0 0 4px}
 .drop-hint-touch{display:none}
 /* 首页: 上传 / 下载切换。滑块与两个面板一起滑动; 两个面板叠在同一个网格单元里, 高度总是一致 */
-.mode-switch{position:relative;display:grid;grid-template-columns:1fr 1fr;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:0 auto 20px;padding:4px;border-radius:999px;background:color-mix(in srgb,var(--muted) 15%,transparent);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.mode-switch{position:relative;display:grid;grid-template-columns:1fr 1fr;width:calc(var(--code-box-w) * 4 + var(--code-gap) * 3);max-width:100%;margin:0 auto 20px;padding:4px;border-radius:999px;background:var(--switch-track);box-shadow:var(--switch-track-shadow);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
 .mode-switch button{position:relative;z-index:1;border:0;background:none;padding:9px 0;border-radius:999px;font-weight:600;color:var(--muted);cursor:pointer;transition:color .3s ease}
 .mode-switch:hover button{color:var(--text)}
-.mode-switch button[aria-selected="true"]{color:var(--text)}
+.mode-switch button[aria-selected="true"]{color:var(--switch-on)}
 .mode-switch button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.mode-thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--switch-thumb);box-shadow:0 1px 2px rgba(0,0,0,.08),0 3px 10px rgba(20,30,55,.12);transition:transform .42s cubic-bezier(.34,1.32,.52,1)}
+.mode-thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--switch-thumb);box-shadow:var(--switch-thumb-shadow);transition:transform .42s cubic-bezier(.34,1.32,.52,1)}
 .mode-switch[data-mode="download"] .mode-thumb{transform:translateX(100%)}
 /* 横向裁掉滑出去的面板, 纵向不裁 (按钮的悬停上浮和焦点框不会被切掉) */
 .mode-stage{display:grid;overflow-x:clip;overflow-clip-margin:6px}
