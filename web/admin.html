@@ -7,7 +7,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="stylesheet" href="/static/css/app.css?v=20261109-4">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261109-5">
   <script src="/static/js/prefs.js?v=20261108-3"></script>
 </head>
 <body>
@@ -246,6 +246,19 @@
             <div id="apiKeys" class="api-keys"></div>
           </section>
 
+          <!-- 给 AI agent / LLM 看的版本: 内容由服务器生成 (app/llm_doc.py), 与 /api/v1/llms.txt 相同 -->
+          <section class="card api-ai">
+            <h2 data-i18n="admin.apiAiTitle">For AI agents / LLMs</h2>
+            <p class="meta" id="apiAiDesc"></p>
+            <div class="row api-ai-actions">
+              <button type="button" id="apiAiCopy" class="primary accent" data-i18n="admin.apiAiCopy">Copy for AI</button>
+              <button type="button" id="apiAiDownload" class="primary" data-i18n="admin.apiAiDownload">Download .md</button>
+              <button type="button" id="apiAiToggle" class="link" aria-expanded="false" aria-controls="apiAiDoc" data-i18n="admin.apiAiShow">Show document</button>
+              <span id="apiAiMsg" class="meta" role="status"></span>
+            </div>
+            <pre id="apiAiDoc" class="api-ai-doc hidden"></pre>
+          </section>
+
           <section class="card api-doc">
             <h2 data-i18n="admin.apiDocTitle">How to use the API</h2>
 
@@ -270,6 +283,7 @@ curl -H "Authorization: Bearer $SHAREWEB_KEY" $SHAREWEB_URL/api/v1/info</pre>
                 <tr><td><b class="m m-get">GET</b></td><td><code>/shares/{token}</code></td><td><span data-lang="en">One share by its link token. Text shares include the text.</span><span data-lang="zh">按链接里的 token 查一个分享；文字分享会附上正文。</span></td></tr>
                 <tr><td><b class="m m-del">DELETE</b></td><td><code>/shares/{token}</code></td><td><span data-lang="en">Delete a share created with this key. Returns <code>204</code>.</span><span data-lang="zh">删除用这个密钥创建的分享。返回 <code>204</code>。</span></td></tr>
                 <tr><td><b class="m m-get">GET</b></td><td><code>/codes/{code}</code></td><td><span data-lang="en">Find a share by its 4-digit code. Wrong codes count toward the per-IP limit, as on the website.</span><span data-lang="zh">按 4 位提取码查分享。输错的次数与网页一样按 IP 计入限制。</span></td></tr>
+                <tr><td><b class="m m-get">GET</b></td><td><code>/llms.txt</code></td><td><span data-lang="en">This guide for AI agents, in Markdown (see "For AI agents / LLMs" above).</span><span data-lang="zh">给 AI agent 看的说明（Markdown，即上面「给 AI 看的版本」）。</span></td></tr>
                 <tr><td><b class="m m-get">GET</b></td><td><code>/download/{token}</code></td><td><span data-lang="en">Download the file. This is the share's <code>download_url</code>; it is not under <code>/api/v1</code> and needs no key.</span><span data-lang="zh">下载文件，即分享里的 <code>download_url</code>。不在 <code>/api/v1</code> 下，不需要密钥。</span></td></tr>
               </tbody>
             </table></div>
@@ -404,6 +418,6 @@ print(share["code"], share["url"])</pre>
     </div>
   </main>
   <div class="chart-tip hidden" id="chartTip" role="status"></div>
-  <script src="/static/js/admin.js?v=20261109-1"></script>
+  <script src="/static/js/admin.js?v=20261109-2"></script>
 </body>
 </html>

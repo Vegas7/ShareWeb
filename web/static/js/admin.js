@@ -49,6 +49,10 @@ I18N.add({
     'admin.apiDocFields': 'Share fields', 'admin.apiDocErrors': 'Status codes',
     'admin.apiColMethod': 'Method', 'admin.apiColPath': 'Path', 'admin.apiColDesc': 'Description',
     'admin.apiLimits': 'On this server: files up to {file}, text up to {text}, shares kept for {days} days.', 'admin.apiNoLimit': 'no limit',
+    'admin.apiAiTitle': 'For AI agents / LLMs',
+    'admin.apiAiDesc': "A compact English version of this guide, written for language models. Give it to an AI agent together with an API key, and it can upload, share and fetch files on its own. An agent that has a key can also read it itself from <code>{url}</code>.",
+    'admin.apiAiCopy': 'Copy for AI', 'admin.apiAiDownload': 'Download .md', 'admin.apiAiShow': 'Show document', 'admin.apiAiHide': 'Hide document',
+    'admin.apiAiCopied': 'Copied. Paste it into the agent\'s instructions.',
     'admin.pwTitle': 'Change admin password', 'admin.pwCurrent': 'Current password', 'admin.pwNew': 'New password', 'admin.pwConfirm': 'Confirm new password', 'admin.pwSave': 'Change password',
     'admin.pwFromEnv': 'Currently using SHAREWEB_ADMIN_PASSWORD from .env. Once changed here, the new password replaces it.', 'admin.pwChanged': 'The password has been changed here, so SHAREWEB_ADMIN_PASSWORD in .env no longer works. If you forget it, see "Forgot the admin password" in the README.', 'admin.pwSignOut': 'Changing it signs out every other device.',
     'admin.pwNeedCurrent': 'Enter the current password', 'admin.pwTooShort': 'The new password needs at least {n} characters', 'admin.pwMismatch': 'The two new passwords don\'t match', 'admin.pwSame': 'The new password is the same as the current one', 'admin.pwWrongLeft': 'Wrong password. {n} attempt(s) left before a temporary lockout', 'admin.pwLocked': 'Too many wrong passwords. Try again after {t}', 'admin.pwDone': 'Password changed ✓', 'admin.pwDoneOthers': 'Password changed ✓ Signed out {n} other session(s)', 'admin.pwFailed': 'Failed to change the password: {msg}',
@@ -127,6 +131,10 @@ I18N.add({
     'admin.apiDocFields': '分享对象的字段', 'admin.apiDocErrors': '状态码',
     'admin.apiColMethod': '方法', 'admin.apiColPath': '路径', 'admin.apiColDesc': '说明',
     'admin.apiLimits': '本服务器：单文件上限 {file}，文字上限 {text}，分享保留 {days} 天。', 'admin.apiNoLimit': '不限',
+    'admin.apiAiTitle': '给 AI 看的版本',
+    'admin.apiAiDesc': '为 AI agent / 大语言模型整理的精简版说明（英文，模型理解起来最准确）。把它和 API 密钥一起交给 AI agent，它就能自己上传、分享和提取文件。已经拿到密钥的 agent 也可以自己读取：<code>{url}</code>。',
+    'admin.apiAiCopy': '复制给 AI', 'admin.apiAiDownload': '下载 .md', 'admin.apiAiShow': '查看全文', 'admin.apiAiHide': '收起全文',
+    'admin.apiAiCopied': '已复制，粘贴到 agent 的指令 / 提示词里即可。',
     'admin.pwTitle': '修改管理员密码', 'admin.pwCurrent': '当前密码', 'admin.pwNew': '新密码', 'admin.pwConfirm': '确认新密码', 'admin.pwSave': '修改密码',
     'admin.pwFromEnv': '当前使用 .env 中的 SHAREWEB_ADMIN_PASSWORD。在这里修改后以新密码为准。', 'admin.pwChanged': '密码已在后台修改过，.env 中的 SHAREWEB_ADMIN_PASSWORD 不再生效。忘记密码时参见 README 中的「忘记管理员密码」。', 'admin.pwSignOut': '修改后，其他设备上的登录会全部退出。',
     'admin.pwNeedCurrent': '请输入当前密码', 'admin.pwTooShort': '新密码至少需要 {n} 个字符', 'admin.pwMismatch': '两次输入的新密码不一致', 'admin.pwSame': '新密码与当前密码相同', 'admin.pwWrongLeft': '密码错误，再错 {n} 次将暂时锁定', 'admin.pwLocked': '密码错误次数过多，请于 {t} 后再试', 'admin.pwDone': '密码已修改 ✓', 'admin.pwDoneOthers': '密码已修改 ✓ 已退出其他 {n} 处登录', 'admin.pwFailed': '修改失败：{msg}',
@@ -521,6 +529,31 @@ $('#apiKeys').addEventListener('click', async e => {
   loadApiKeys().catch(() => {});
 });
 document.querySelectorAll('.api-origin').forEach(el => { el.textContent = location.origin; });
+// 给 AI 看的版本: 服务器按当前设置生成 (与 /api/v1/llms.txt 相同)
+let llmDoc = '';
+async function loadLlmDoc() {
+  const r = await fetch('/api/admin/llm-doc');
+  if (!r.ok) throw new Error('llm doc');
+  llmDoc = await r.text();
+  $('#apiAiDoc').textContent = llmDoc;
+}
+setKey($('#apiAiDesc'), 'admin.apiAiDesc', { url: location.origin + '/api/v1/llms.txt' }, true);
+$('#apiAiCopy').onclick = async () => {
+  if (llmDoc && await copy(llmDoc)) setKey($('#apiAiMsg'), 'admin.apiAiCopied');
+};
+$('#apiAiDownload').onclick = () => {
+  if (!llmDoc) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([llmDoc], { type: 'text/markdown;charset=utf-8' }));
+  a.download = 'shareweb-api.md';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#apiAiToggle').onclick = () => {
+  const open = $('#apiAiDoc').classList.toggle('hidden') === false;
+  $('#apiAiToggle').setAttribute('aria-expanded', open);
+  setKey($('#apiAiToggle'), open ? 'admin.apiAiHide' : 'admin.apiAiShow');
+};
 // 代码示例右上角的「复制」按钮
 document.querySelectorAll('.api-code').forEach(pre => {
   const b = document.createElement('button');
@@ -543,7 +576,7 @@ const TZ = new Date().getTimezoneOffset();
 // 刷新全部数据; 统计接口失败 (未登录 / 会话过期) 时抛出
 async function load() {
   renderStats(await api('/api/admin/stats?tz=' + TZ));
-  await Promise.all([loadVisitors(), loadFiles(), loadOverview(), loadSettings(), loadApiKeys()]);
+  await Promise.all([loadVisitors(), loadFiles(), loadOverview(), loadSettings(), loadApiKeys(), loadLlmDoc()]);
 }
 
 function showPanel(on) {

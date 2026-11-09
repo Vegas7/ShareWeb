@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -32,7 +32,7 @@ from . import github_mirror
 from . import geoip, visitors
 from . import app_settings
 from . import resumable
-from . import api_v1, apikeys
+from . import api_v1, apikeys, llm_doc
 from .shareops import (share_payload as _share_payload, ensure_space as _ensure_space, disk_full_handler as _disk_full_handler,
                        create_file_share as _create_file_share, resolve_share_path as _resolve_share_path)
 
@@ -688,6 +688,11 @@ async def admin_create_api_key(request: Request, payload: AdminApiKeyRequest):
     key = await run_in_threadpool(apikeys.create_key, payload.name.strip() or "API key")
     log_event(client_ip(request), "API_KEY_CREATE", "SUCCESS", detail=f"ID={key['id']} NAME={key['name']}")
     return key  # 明文密钥只在这里返回一次
+
+@admin_api.get("/llm-doc")
+async def admin_llm_doc():
+    """「API」页里给 AI agent / LLM 看的说明 (与 /api/v1/llms.txt 相同)。"""
+    return PlainTextResponse(llm_doc.render(), media_type="text/markdown; charset=utf-8")
 
 @admin_api.delete("/api-keys/{key_id}")
 async def admin_delete_api_key(key_id: int, request: Request):

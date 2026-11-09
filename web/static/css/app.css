@@ -472,6 +472,10 @@ html.admin-page{scrollbar-gutter:stable}
 .api-key-name{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:2px}
 .api-key-name code{font:12.5px ui-monospace,Consolas,monospace;color:var(--muted)}
 .api-key-del{color:var(--danger);flex-shrink:0}
+.api-ai-actions{margin-top:12px;flex-wrap:wrap;gap:8px 10px}
+.api-ai-actions .link{margin-left:4px}
+.api-ai .meta code{font:12.5px ui-monospace,Consolas,monospace;background:color-mix(in srgb,var(--muted) 14%,transparent);padding:1px 5px;border-radius:5px;word-break:break-all}
+.api-ai-doc{margin:12px 0 0;max-height:460px;overflow:auto;padding:12px 14px;border:1px solid var(--card-border);border-radius:10px;background:var(--field);font:12.5px/1.6 ui-monospace,Consolas,monospace;color:var(--text);white-space:pre-wrap;word-break:break-word}
 .api-doc h3{font-size:15px;margin:24px 0 8px}
 .api-doc h2 + h3{margin-top:4px}
 .api-doc p,.api-doc li{line-height:1.65}

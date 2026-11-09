@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
@@ -20,7 +20,7 @@ from .services import (SPECIAL_CODE, RedeemBlocked, create_share_text, delete_ke
                        get_share_by_token, list_key_shares, log_event, redeem_code)
 from .shareops import create_file_share, disk_full_handler, ensure_space, share_url
 from .storage import BadUpload, DiskFull, UploadTooLarge, save_text, save_upload_stream
-from . import apikeys, resumable
+from . import apikeys, llm_doc, resumable
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,12 @@ async def info(caller: Caller = Depends(require_key)):
     return {"max_upload_bytes": settings.max_upload_bytes, "max_text_bytes": settings.max_text_bytes,
             "retention_days": settings.retention_days, "max_chunk_bytes": resumable.MAX_CHUNK_BYTES,
             "key": {"id": caller.key_id, "name": caller.key_name}}
+
+
+@router.get("/llms.txt", response_class=PlainTextResponse)
+async def llms_txt():
+    """给 AI agent 看的 API 说明 (Markdown), 与管理后台「API」页里的「给 AI 看的版本」相同。"""
+    return PlainTextResponse(llm_doc.render(), media_type="text/markdown; charset=utf-8")
 
 
 @router.post("/files", status_code=201)
