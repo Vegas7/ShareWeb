@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS shares (
     github_path TEXT,
     github_sha TEXT,
     -- 管理员锁定: 锁定的文件不过期, 也不会被手动/自动清理删除, 直到解锁
-    locked INTEGER NOT NULL DEFAULT 0
+    locked INTEGER NOT NULL DEFAULT 0,
+    api_key_id INTEGER
 );
 CREATE TABLE IF NOT EXISTS access_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,7 +91,19 @@ CREATE TABLE IF NOT EXISTS uploads (
     content_type TEXT,
     ip TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    api_key_id INTEGER
+);
+-- 外部 API 的密钥 (见 apikeys.py)。只存 SHA-256, 明文只在创建时显示一次
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT,
+    last_ip TEXT,
+    use_count INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_shares_code_active ON shares(code, active, expires_at);
 CREATE INDEX IF NOT EXISTS idx_shares_expires ON shares(expires_at);
@@ -105,6 +118,11 @@ _ADDED_COLUMNS = {
         "github_path": "TEXT",
         "github_sha": "TEXT",
         "locked": "INTEGER NOT NULL DEFAULT 0",
+        # 通过外部 API 创建时记下是哪个密钥 (网页上传为 NULL); 该密钥可列出 / 删除自己创建的分享
+        "api_key_id": "INTEGER",
+    },
+    "uploads": {
+        "api_key_id": "INTEGER",
     },
 }
 
@@ -118,3 +136,4 @@ def init_db():
             for name, ddl in columns.items():
                 if name not in existing:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_shares_api_key ON shares(api_key_id)")

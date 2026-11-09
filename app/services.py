@@ -41,26 +41,48 @@ def generate_unique_code(conn):
             return code
     raise RuntimeError("could not allocate a unique 4-digit share code")
 
-def _create_share(kind, original_name, mime_type, size, sha256, storage_name, storage_path):
+def _create_share(kind, original_name, mime_type, size, sha256, storage_name, storage_path, api_key_id=None):
     now = utcnow(); exp = now + timedelta(days=settings.retention_days)
     token = random_token()
     with connect() as conn:
         code = generate_unique_code(conn)
         cur = conn.execute(
-            "INSERT INTO shares(token,code,type,original_name,storage_name,storage_path,size,mime_type,sha256,enc_key,created_at,expires_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-            (token, code, kind, original_name, storage_name, storage_path, size, mime_type, sha256, new_key_b64(), iso(now), iso(exp)))
+            "INSERT INTO shares(token,code,type,original_name,storage_name,storage_path,size,mime_type,sha256,enc_key,created_at,expires_at,api_key_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (token, code, kind, original_name, storage_name, storage_path, size, mime_type, sha256, new_key_b64(), iso(now), iso(exp), api_key_id))
     return cur.lastrowid, token, code, iso(exp)
 
-def create_share_file(original_name, mime_type, size, sha256, storage_name, storage_path, ip, user_agent):
-    share_id, token, code, exp = _create_share("file", original_name, mime_type, size, sha256, storage_name, storage_path)
-    log_event(ip, "UPLOAD", "SUCCESS", share_id, f"FILE={original_name} SIZE={size} SHA256={sha256} CODE={code}", user_agent)
+def _via(api_key_id):
+    return f" API_KEY={api_key_id}" if api_key_id else ""
+
+def create_share_file(original_name, mime_type, size, sha256, storage_name, storage_path, ip, user_agent, api_key_id=None):
+    share_id, token, code, exp = _create_share("file", original_name, mime_type, size, sha256, storage_name, storage_path, api_key_id)
+    log_event(ip, "UPLOAD", "SUCCESS", share_id, f"FILE={original_name} SIZE={size} SHA256={sha256} CODE={code}{_via(api_key_id)}", user_agent)
     return share_id, token, code, exp
 
-def create_share_text(storage_name, storage_path, size, sha256, ip, user_agent):
-    share_id, token, code, exp = _create_share("text", "text.txt", "text/plain; charset=utf-8", size, sha256, storage_name, storage_path)
-    log_event(ip, "UPLOAD_TEXT", "SUCCESS", share_id, f"SIZE={size} SHA256={sha256} CODE={code}", user_agent)
+def create_share_text(storage_name, storage_path, size, sha256, ip, user_agent, api_key_id=None):
+    share_id, token, code, exp = _create_share("text", "text.txt", "text/plain; charset=utf-8", size, sha256, storage_name, storage_path, api_key_id)
+    log_event(ip, "UPLOAD_TEXT", "SUCCESS", share_id, f"SIZE={size} SHA256={sha256} CODE={code}{_via(api_key_id)}", user_agent)
     return share_id, token, code, exp
+
+def list_key_shares(api_key_id, limit=100, offset=0):
+    """某个 API 密钥创建的、仍然有效的分享 (新的在前)。返回 (rows, 总数)。"""
+    now = iso(utcnow())
+    with connect() as conn:
+        total = conn.execute(f"SELECT COUNT(*) c FROM shares WHERE api_key_id=? AND {_ALIVE_WHERE}", (api_key_id, now)).fetchone()["c"]
+        rows = conn.execute(f"SELECT * FROM shares WHERE api_key_id=? AND {_ALIVE_WHERE} ORDER BY id DESC LIMIT ? OFFSET ?",
+                            (api_key_id, now, limit, offset)).fetchall()
+    return rows, total
+
+def delete_key_share(token, api_key_id):
+    """删除 API 密钥自己创建的分享 (文件或文本)。返回 'deleted' / 'not_found' / 'locked'。"""
+    row = get_share_by_token(token)
+    if not row or row["api_key_id"] != api_key_id:
+        return "not_found"
+    if row["locked"]:
+        return "locked"
+    with connect() as conn:
+        return "deleted" if _purge(conn, row) else "locked"
 
 def share_status(tokens):
     """首页「本地历史」用: 只读地查询一批分享是否还在。

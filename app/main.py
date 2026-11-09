@@ -32,6 +32,9 @@ from . import github_mirror
 from . import geoip, visitors
 from . import app_settings
 from . import resumable
+from . import api_v1, apikeys
+from .shareops import (share_payload as _share_payload, ensure_space as _ensure_space, disk_full_handler as _disk_full_handler,
+                       create_file_share as _create_file_share, resolve_share_path as _resolve_share_path)
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -147,6 +150,9 @@ class AdminPasswordRequest(BaseModel):
     current: str = Field(max_length=256)
     new: str = Field(min_length=app_settings.MIN_ADMIN_PASSWORD, max_length=256)
 
+class AdminApiKeyRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
 class AdminSettingsRequest(BaseModel):
     # 只修改传了的字段。单文件上限 (MB); 0 = 不限制 (仍受磁盘剩余空间约束)
     max_upload_mb: Optional[int] = Field(default=None, ge=0, le=app_settings.MAX_UPLOAD_MB_CAP)
@@ -185,34 +191,6 @@ async def share_status_api(request: Request, payload: ShareStatusRequest):
     tokens = [t for t in payload.tokens if isinstance(t, str) and 0 < len(t) <= 64]
     status, codes = await run_in_threadpool(share_status, tokens)
     return {"status": status, "codes": codes}
-
-def _share_payload(row) -> dict:
-    return {"token": row["token"], "code": row["code"], "filename": row["original_name"], "size": row["size"],
-            "sha256": row["sha256"], "expires_at": None if row["locked"] else row["expires_at"],
-            "url": f"{settings.public_base_url}/share/{row['token']}"}
-
-async def _ensure_space(need: int, ip: str):
-    """磁盘放不下 need 字节时 (开启「自动清理」则先删最旧的文件腾空间) 返回 507。"""
-    if need > app_settings.upload_capacity_bytes():
-        if not (settings.auto_evict and await run_in_threadpool(evict_for_space, need, app_settings.upload_capacity_bytes, ip)):
-            raise HTTPException(507, "not enough disk space on server")
-
-def _disk_full_handler(ip: str):
-    return (lambda need: evict_for_space(need, app_settings.upload_capacity_bytes, ip)) if settings.auto_evict else None
-
-def _create_file_share(request, background, filename, content_type, size, sha, stored_name, rel_path, ip) -> dict:
-    # 浏览器对 .mov 等常报空/通用 MIME，按扩展名补正，保证前端能识别为视频。
-    mime = content_type or ""
-    if not mime or mime == "application/octet-stream":
-        guessed, _ = mimetypes.guess_type(filename or "")
-        mime = guessed or "application/octet-stream"
-    filename = filename or "download.bin"
-    share_id, token, code, expires_at = create_share_file(
-        filename, mime, size, sha, stored_name, rel_path, ip, request.headers.get("user-agent","-"))
-    if github_mirror.enabled() and github_mirror.fits(size):
-        # 后台镜像到 GitHub 私仓，不阻塞上传响应。
-        background.add_task(mirror_to_github, share_id)
-    return {"ok": True, "id": share_id, "token": token, "code": code, "filename": filename, "size": size, "sha256": sha, "expires_at": expires_at, "url": f"{settings.public_base_url}/share/{token}"}
 
 @app.post("/api/upload/init")
 async def upload_init(request: Request, payload: UploadInitRequest):
@@ -359,15 +337,6 @@ async def redeem(request: Request, payload: RedeemRequest):
     if row is None:
         return JSONResponse({"ok": False, "error": "invalid_code", "fail_count": fail_count}, status_code=404)
     return {"ok": True, "token": row["token"], "url": f"/share/{row['token']}"}
-
-def _resolve_share_path(row) -> Path:
-    """校验 storage_path 落在 data 目录内并存在, 返回绝对路径。"""
-    abs_path = (settings.data_dir / Path(row["storage_path"])).resolve()
-    root = settings.data_dir.resolve()
-    if root not in abs_path.parents or not abs_path.is_file():
-        raise HTTPException(404, "file missing")
-    return abs_path
-
 
 @app.get("/download/{token}")
 async def download(token: str, request: Request, enc: int = 0, inline: int = 0):
@@ -709,6 +678,24 @@ async def admin_allow_ips(request: Request, payload: AdminIpsRequest):
     log_event(client_ip(request), "ADMIN_ALLOW_IPS", "SUCCESS", detail=f"IPS={','.join(ips[:50])} CHANGED={changed}")
     return {"ok": True, "allowed": changed}
 
+# ---- 外部 API 密钥 (见 apikeys.py / api_v1.py) ----
+@admin_api.get("/api-keys")
+async def admin_list_api_keys():
+    return {"keys": await run_in_threadpool(apikeys.list_keys)}
+
+@admin_api.post("/api-keys")
+async def admin_create_api_key(request: Request, payload: AdminApiKeyRequest):
+    key = await run_in_threadpool(apikeys.create_key, payload.name.strip() or "API key")
+    log_event(client_ip(request), "API_KEY_CREATE", "SUCCESS", detail=f"ID={key['id']} NAME={key['name']}")
+    return key  # 明文密钥只在这里返回一次
+
+@admin_api.delete("/api-keys/{key_id}")
+async def admin_delete_api_key(key_id: int, request: Request):
+    if not await run_in_threadpool(apikeys.delete_key, key_id):
+        raise HTTPException(404, "API key not found")
+    log_event(client_ip(request), "API_KEY_DELETE", "SUCCESS", detail=f"ID={key_id}")
+    return {"ok": True}
+
 @app.get("/special", response_class=HTMLResponse)
 async def special_page(request: Request):
     return (settings.web_dir / "special.html").read_text(encoding="utf-8")
@@ -718,3 +705,4 @@ async def healthz():
     return {"ok": True}
 
 app.include_router(admin_api)
+app.include_router(api_v1.router)

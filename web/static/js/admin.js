@@ -33,7 +33,22 @@ I18N.add({
     'admin.visReason': 'Reason: {r}', 'admin.visUnknownGeo': 'Unknown location', 'admin.visPrivate': 'Private / local network',
     'admin.visBlocked': 'Blocked {n} IPs.', 'admin.visBlockedSelf': 'Blocked {n} IPs. Skipped your own IP ({ip}) so you don\'t lock yourself out.',
     'admin.visAllowed': 'Allowed {n} IPs.', 'admin.visFailed': 'Failed: {msg}', 'admin.visCredit': 'IP location data',
-    'admin.navOverview': 'Overview', 'admin.navFiles': 'Files', 'admin.navSecurity': 'Security', 'admin.navAdvanced': 'Advanced', 'admin.navPassword': 'Password',
+    'admin.navOverview': 'Overview', 'admin.navFiles': 'Files', 'admin.navSecurity': 'Security', 'admin.navAdvanced': 'Advanced', 'admin.navPassword': 'Password', 'admin.navApi': 'API',
+    'admin.apiKeysTitle': 'API keys',
+    'admin.apiKeysDesc': 'Every API request needs a key. The full key is shown only once, right after it is created. Deleting a key revokes it immediately; shares created with it stay until they expire.',
+    'admin.apiKeyNamePh': 'Key name, e.g. backup script', 'admin.apiKeyCreate': 'Create key',
+    'admin.apiKeyNewNote': "Copy this key now. It won't be shown again.", 'admin.apiCopy': 'Copy', 'admin.apiCopied': 'Copied',
+    'admin.apiKeysEmpty': 'No API keys yet.', 'admin.apiKeyNameNeeded': 'Enter a name for the key first.',
+    'admin.apiKeyMeta': 'Created {created} · {n} requests · {shares} active shares',
+    'admin.apiKeyLastUsed': 'Last used {t} from {ip}', 'admin.apiKeyNeverUsed': 'Never used',
+    'admin.apiKeyDelete': 'Delete', 'admin.apiKeyDeleted': 'Key deleted.',
+    'admin.apiKeyConfirmDelete': 'Delete the key "{name}"? Programs using it stop working immediately. Shares created with it are kept.',
+    'admin.apiKeyFailed': 'Failed: {msg}',
+    'admin.apiDocTitle': 'How to use the API', 'admin.apiDocBasics': 'Basics', 'admin.apiDocEndpoints': 'Endpoints',
+    'admin.apiDocExamples': 'Examples', 'admin.apiDocResume': 'Resumable upload (large files)',
+    'admin.apiDocFields': 'Share fields', 'admin.apiDocErrors': 'Status codes',
+    'admin.apiColMethod': 'Method', 'admin.apiColPath': 'Path', 'admin.apiColDesc': 'Description',
+    'admin.apiLimits': 'On this server: files up to {file}, text up to {text}, shares kept for {days} days.', 'admin.apiNoLimit': 'no limit',
     'admin.pwTitle': 'Change admin password', 'admin.pwCurrent': 'Current password', 'admin.pwNew': 'New password', 'admin.pwConfirm': 'Confirm new password', 'admin.pwSave': 'Change password',
     'admin.pwFromEnv': 'Currently using SHAREWEB_ADMIN_PASSWORD from .env. Once changed here, the new password replaces it.', 'admin.pwChanged': 'The password has been changed here, so SHAREWEB_ADMIN_PASSWORD in .env no longer works. If you forget it, see "Forgot the admin password" in the README.', 'admin.pwSignOut': 'Changing it signs out every other device.',
     'admin.pwNeedCurrent': 'Enter the current password', 'admin.pwTooShort': 'The new password needs at least {n} characters', 'admin.pwMismatch': 'The two new passwords don\'t match', 'admin.pwSame': 'The new password is the same as the current one', 'admin.pwWrongLeft': 'Wrong password. {n} attempt(s) left before a temporary lockout', 'admin.pwLocked': 'Too many wrong passwords. Try again after {t}', 'admin.pwDone': 'Password changed ✓', 'admin.pwDoneOthers': 'Password changed ✓ Signed out {n} other session(s)', 'admin.pwFailed': 'Failed to change the password: {msg}',
@@ -96,7 +111,22 @@ I18N.add({
     'admin.visReason': '原因：{r}', 'admin.visUnknownGeo': '未知地区', 'admin.visPrivate': '内网 / 本机地址',
     'admin.visBlocked': '已封禁 {n} 个 IP。', 'admin.visBlockedSelf': '已封禁 {n} 个 IP；已跳过你当前的 IP（{ip}），以免把自己挡在外面。',
     'admin.visAllowed': '已解封 {n} 个 IP。', 'admin.visFailed': '操作失败：{msg}', 'admin.visCredit': 'IP 位置数据',
-    'admin.navOverview': '总览', 'admin.navFiles': '文件管理', 'admin.navSecurity': '安全设置', 'admin.navAdvanced': '高级设置', 'admin.navPassword': '管理员密码',
+    'admin.navOverview': '总览', 'admin.navFiles': '文件管理', 'admin.navSecurity': '安全设置', 'admin.navAdvanced': '高级设置', 'admin.navPassword': '管理员密码', 'admin.navApi': 'API',
+    'admin.apiKeysTitle': 'API 密钥',
+    'admin.apiKeysDesc': '每个 API 请求都要带密钥。完整的密钥只在创建后显示一次。删除密钥后立即失效，用它创建的分享保留到过期。',
+    'admin.apiKeyNamePh': '密钥名称，如：备份脚本', 'admin.apiKeyCreate': '创建密钥',
+    'admin.apiKeyNewNote': '请现在复制保存这个密钥，之后不会再显示。', 'admin.apiCopy': '复制', 'admin.apiCopied': '已复制',
+    'admin.apiKeysEmpty': '还没有 API 密钥。', 'admin.apiKeyNameNeeded': '请先填写密钥名称。',
+    'admin.apiKeyMeta': '创建于 {created} · 调用 {n} 次 · 有效分享 {shares} 个',
+    'admin.apiKeyLastUsed': '最近使用 {t}（{ip}）', 'admin.apiKeyNeverUsed': '从未使用',
+    'admin.apiKeyDelete': '删除', 'admin.apiKeyDeleted': '密钥已删除。',
+    'admin.apiKeyConfirmDelete': '删除密钥「{name}」？使用它的程序会立即无法调用，用它创建的分享保留。',
+    'admin.apiKeyFailed': '操作失败：{msg}',
+    'admin.apiDocTitle': 'API 使用说明', 'admin.apiDocBasics': '基本说明', 'admin.apiDocEndpoints': '接口列表',
+    'admin.apiDocExamples': '示例', 'admin.apiDocResume': '断点续传（大文件）',
+    'admin.apiDocFields': '分享对象的字段', 'admin.apiDocErrors': '状态码',
+    'admin.apiColMethod': '方法', 'admin.apiColPath': '路径', 'admin.apiColDesc': '说明',
+    'admin.apiLimits': '本服务器：单文件上限 {file}，文字上限 {text}，分享保留 {days} 天。', 'admin.apiNoLimit': '不限',
     'admin.pwTitle': '修改管理员密码', 'admin.pwCurrent': '当前密码', 'admin.pwNew': '新密码', 'admin.pwConfirm': '确认新密码', 'admin.pwSave': '修改密码',
     'admin.pwFromEnv': '当前使用 .env 中的 SHAREWEB_ADMIN_PASSWORD。在这里修改后以新密码为准。', 'admin.pwChanged': '密码已在后台修改过，.env 中的 SHAREWEB_ADMIN_PASSWORD 不再生效。忘记密码时参见 README 中的「忘记管理员密码」。', 'admin.pwSignOut': '修改后，其他设备上的登录会全部退出。',
     'admin.pwNeedCurrent': '请输入当前密码', 'admin.pwTooShort': '新密码至少需要 {n} 个字符', 'admin.pwMismatch': '两次输入的新密码不一致', 'admin.pwSame': '新密码与当前密码相同', 'admin.pwWrongLeft': '密码错误，再错 {n} 次将暂时锁定', 'admin.pwLocked': '密码错误次数过多，请于 {t} 后再试', 'admin.pwDone': '密码已修改 ✓', 'admin.pwDoneOthers': '密码已修改 ✓ 已退出其他 {n} 处登录', 'admin.pwFailed': '修改失败：{msg}',
@@ -447,12 +477,73 @@ async function setLocked(locked) {
 $('#lockSelected').onclick = () => setLocked(true);
 $('#unlockSelected').onclick = () => setLocked(false);
 
+// ---- 外部 API: 密钥管理; 使用说明是 admin.html 里的静态内容, 这里只填上本站地址和当前限制 ----
+async function loadApiKeys() {
+  const { keys } = await api('/api/admin/api-keys');
+  $('#apiKeys').innerHTML = keys.length ? keys.map(k => `
+    <div class="api-key-row">
+      <div class="api-key-main">
+        <div class="api-key-name"><b>${esc(k.name)}</b><code>${esc(k.prefix)}…</code></div>
+        <div class="meta">${S('admin.apiKeyMeta', { created: { date: k.created_at }, n: k.use_count, shares: k.share_count })}</div>
+        <div class="meta">${k.last_used_at ? S('admin.apiKeyLastUsed', { t: { date: k.last_used_at }, ip: k.last_ip || '-' }) : S('admin.apiKeyNeverUsed')}</div>
+      </div>
+      <button type="button" class="link api-key-del" data-id="${k.id}" data-name="${esc(k.name)}">${S('admin.apiKeyDelete')}</button>
+    </div>`).join('') : `<p class="meta">${S('admin.apiKeysEmpty')}</p>`;
+}
+$('#apiKeyCreate').onclick = async () => {
+  const name = $('#apiKeyName').value.trim();
+  if (!name) { setKey($('#apiKeyMsg'), 'admin.apiKeyNameNeeded'); $('#apiKeyName').focus(); return; }
+  setKey($('#apiKeyMsg'), null);
+  try {
+    const k = await api('/api/admin/api-keys', { name });
+    $('#apiKeyValue').textContent = k.key;
+    $('#apiKeyNew').classList.remove('hidden');
+    setKey($('#apiKeyCopy'), 'admin.apiCopy');
+    $('#apiKeyName').value = '';
+  } catch (e) {
+    setKey($('#apiKeyMsg'), 'admin.apiKeyFailed', { msg: e.message });
+  }
+  loadApiKeys().catch(() => {});
+};
+$('#apiKeyName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#apiKeyCreate').click(); });
+$('#apiKeyCopy').onclick = async () => {
+  if (await copy($('#apiKeyValue').textContent)) setKey($('#apiKeyCopy'), 'admin.apiCopied');
+};
+$('#apiKeys').addEventListener('click', async e => {
+  const btn = e.target.closest('.api-key-del');
+  if (!btn || !confirm(t('admin.apiKeyConfirmDelete', { name: btn.dataset.name }))) return;
+  try {
+    await api('/api/admin/api-keys/' + btn.dataset.id, {}, 'DELETE');
+    setKey($('#apiKeyMsg'), 'admin.apiKeyDeleted');
+  } catch (e) {
+    setKey($('#apiKeyMsg'), 'admin.apiKeyFailed', { msg: e.message });
+  }
+  loadApiKeys().catch(() => {});
+});
+document.querySelectorAll('.api-origin').forEach(el => { el.textContent = location.origin; });
+// 代码示例右上角的「复制」按钮
+document.querySelectorAll('.api-code').forEach(pre => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'pref-btn api-copy';
+  setKey(b, 'admin.apiCopy');
+  b.onclick = async () => {
+    const code = [...pre.childNodes].filter(n => n !== b).map(n => n.textContent).join('');
+    if (await copy(code)) { setKey(b, 'admin.apiCopied'); setTimeout(() => setKey(b, 'admin.apiCopy'), 1500); }
+  };
+  pre.appendChild(b);
+});
+fetch('/api/config').then(r => r.json()).then(c => {
+  setKey($('#apiLimits'), 'admin.apiLimits', {
+    file: c.max_upload_bytes == null ? { key: 'admin.apiNoLimit' } : fmtSize(c.max_upload_bytes),
+    text: fmtSize(c.max_text_bytes), days: c.retention_days });
+}).catch(() => {});
+
 const TZ = new Date().getTimezoneOffset();
 
 // 刷新全部数据; 统计接口失败 (未登录 / 会话过期) 时抛出
 async function load() {
   renderStats(await api('/api/admin/stats?tz=' + TZ));
-  await Promise.all([loadVisitors(), loadFiles(), loadOverview(), loadSettings()]);
+  await Promise.all([loadVisitors(), loadFiles(), loadOverview(), loadSettings(), loadApiKeys()]);
 }
 
 function showPanel(on) {

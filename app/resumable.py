@@ -76,11 +76,12 @@ def discard(upload_id: str):
 
 
 def open_session(sha256: str, size: int, filename: str, content_type: str | None, ip: str,
-                 upload_id: str | None = None) -> tuple[str, int]:
-    """返回 (upload_id, 已收字节数)。upload_id 对应的会话与本次文件一致时续传, 否则新建会话。"""
+                 upload_id: str | None = None, api_key_id: int | None = None) -> tuple[str, int]:
+    """返回 (upload_id, 已收字节数)。upload_id 对应的会话与本次文件一致 (且是同一个 API 密钥 / 都来自网页) 时续传,
+    否则新建会话。"""
     now = iso(utcnow())
     row = _get(upload_id) if upload_id else None
-    if row and row["sha256"] == sha256 and row["size"] == size:
+    if row and row["sha256"] == sha256 and row["size"] == size and row["api_key_id"] == api_key_id:
         path = part_path(row["id"])
         offset = _part_size(path)
         if offset is None or offset > size:
@@ -94,8 +95,8 @@ def open_session(sha256: str, size: int, filename: str, content_type: str | None
     new_id = secrets.token_hex(16)
     open(part_path(new_id), "xb").close()
     with connect() as conn:
-        conn.execute("INSERT INTO uploads (id, sha256, size, filename, content_type, ip, created_at, updated_at) "
-                     "VALUES (?,?,?,?,?,?,?,?)", (new_id, sha256, size, filename, content_type, ip, now, now))
+        conn.execute("INSERT INTO uploads (id, sha256, size, filename, content_type, ip, created_at, updated_at, api_key_id) "
+                     "VALUES (?,?,?,?,?,?,?,?,?)", (new_id, sha256, size, filename, content_type, ip, now, now, api_key_id))
         # 每个 IP 最多保留若干个未完成的会话, 多出来的从最久没动的开始丢弃
         extra = conn.execute("SELECT id FROM uploads WHERE ip=? ORDER BY updated_at DESC LIMIT -1 OFFSET ?",
                              (ip, MAX_SESSIONS_PER_IP)).fetchall()
@@ -143,8 +144,10 @@ def _complete(upload_id: str) -> tuple[str, str]:
     return stored_name, str(final.relative_to(settings.data_dir))
 
 
-async def receive_chunk(upload_id: str, offset: int, stream, on_disk_full=None):
+async def receive_chunk(upload_id: str, offset: int, stream, on_disk_full=None, api_key_id: int | None = None):
     """把请求体追加到会话的 offset 处 (必须正好等于已收字节数)。
+
+    会话只接受建立它的一方继续上传: 网页建的 (api_key_id 为 None) 或同一个 API 密钥, 否则视为不存在。
 
     返回 (row, 新的已收字节数, done)。done 时 done = (stored_name, rel_path), 文件已校验并移到正式位置。
     中途失败 (断开 / 超限 / 磁盘满) 时把文件截回 offset, 下次从这里重新发这一块。
@@ -152,6 +155,8 @@ async def receive_chunk(upload_id: str, offset: int, stream, on_disk_full=None):
     lock = _locks.setdefault(upload_id, asyncio.Lock())
     async with lock:
         row = await run_in_threadpool(_get, upload_id)
+        if row and row["api_key_id"] != api_key_id:
+            raise UploadNotFound(upload_id)
         path = part_path(upload_id)
         current = _part_size(path) if row else None
         if current is None:

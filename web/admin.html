@@ -7,7 +7,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="stylesheet" href="/static/css/app.css?v=20261109-2">
+  <link rel="stylesheet" href="/static/css/app.css?v=20261109-4">
   <script src="/static/js/prefs.js?v=20261108-3"></script>
 </head>
 <body>
@@ -43,6 +43,7 @@
         <a href="#files" data-view="files"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span data-i18n="admin.navFiles">Files</span></a>
         <a href="#security" data-view="security"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/></svg><span data-i18n="admin.navSecurity">Security</span></a>
         <a href="#advanced" data-view="advanced"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-i18n="admin.navAdvanced">Advanced</span></a>
+        <a href="#api" data-view="api"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><span data-i18n="admin.navApi">API</span></a>
         <a href="#password" data-view="password"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.7-9.7M17 6l3 3M14.5 8.5l2 2"/></svg><span data-i18n="admin.navPassword">Password</span></a>
       </nav>
 
@@ -228,6 +229,156 @@
           </section>
         </div>
 
+        <!-- 外部 API: 密钥管理 + 使用说明 (说明文字中英文各一份, 按当前语言显示其一; 代码示例共用) -->
+        <div class="admin-view" data-view="api">
+          <section class="card">
+            <h2 data-i18n="admin.apiKeysTitle">API keys</h2>
+            <p class="meta" data-i18n="admin.apiKeysDesc">Every API request needs a key. The full key is shown only once, right after it is created. Deleting a key revokes it immediately; shares created with it stay until they expire.</p>
+            <div class="row api-new">
+              <input id="apiKeyName" class="input" maxlength="60" placeholder="Key name, e.g. backup script" data-i18n-placeholder="admin.apiKeyNamePh">
+              <button id="apiKeyCreate" class="primary accent" data-i18n="admin.apiKeyCreate">Create key</button>
+            </div>
+            <div id="apiKeyNew" class="api-key-new hidden" role="status">
+              <p data-i18n="admin.apiKeyNewNote">Copy this key now. It won't be shown again.</p>
+              <div class="api-key-box"><code id="apiKeyValue"></code><button type="button" class="pref-btn" id="apiKeyCopy" data-i18n="admin.apiCopy">Copy</button></div>
+            </div>
+            <div id="apiKeyMsg" class="meta"></div>
+            <div id="apiKeys" class="api-keys"></div>
+          </section>
+
+          <section class="card api-doc">
+            <h2 data-i18n="admin.apiDocTitle">How to use the API</h2>
+
+            <h3 data-i18n="admin.apiDocBasics">Basics</h3>
+            <p data-lang="en">Base URL: <code><span class="api-origin"></span>/api/v1</code>. Send the key in an <code>Authorization: Bearer &lt;key&gt;</code> header (or <code>X-API-Key: &lt;key&gt;</code>). Requests and responses are JSON; errors look like <code>{"detail": "…"}</code>. The website's rules still apply: blacklisted IPs are refused, and wrong share codes count toward the same per-IP limit.</p>
+            <p data-lang="zh">接口地址：<code><span class="api-origin"></span>/api/v1</code>。密钥放在请求头 <code>Authorization: Bearer &lt;密钥&gt;</code> 里（也可以用 <code>X-API-Key: &lt;密钥&gt;</code>）。请求和返回都是 JSON，出错时返回 <code>{"detail": "…"}</code>。网页上的规则同样适用：黑名单里的 IP 会被拒绝，提取码输错与网页共用同一个按 IP 计的次数限制。</p>
+            <p class="meta api-limits" id="apiLimits"></p>
+<pre class="api-code">export SHAREWEB_URL=<span class="api-origin"></span>
+export SHAREWEB_KEY=swk_...
+curl -H "Authorization: Bearer $SHAREWEB_KEY" $SHAREWEB_URL/api/v1/info</pre>
+
+            <h3 data-i18n="admin.apiDocEndpoints">Endpoints</h3>
+            <div class="api-table-wrap"><table class="api-table api-endpoints">
+              <thead><tr><th data-i18n="admin.apiColMethod">Method</th><th data-i18n="admin.apiColPath">Path</th><th data-i18n="admin.apiColDesc">Description</th></tr></thead>
+              <tbody>
+                <tr><td><b class="m m-get">GET</b></td><td><code>/info</code></td><td><span data-lang="en">Server limits (max file size, max text size, retention days, max chunk size) and this key's name.</span><span data-lang="zh">服务器的限制（单文件上限、文本上限、保留天数、单块上限）和当前密钥的名称。</span></td></tr>
+                <tr><td><b class="m m-post">POST</b></td><td><code>/files</code></td><td><span data-lang="en">Upload a file in one request (<code>multipart/form-data</code>, field <code>file</code>). Returns <code>201</code> and the share.</span><span data-lang="zh">一次性上传文件（<code>multipart/form-data</code>，字段名 <code>file</code>）。返回 <code>201</code> 和分享信息。</span></td></tr>
+                <tr><td><b class="m m-post">POST</b></td><td><code>/uploads</code></td><td><span data-lang="en">Start or resume a resumable upload (recommended for large files, see below).</span><span data-lang="zh">开始或继续一个断点续传（大文件推荐，见下文）。</span></td></tr>
+                <tr><td><b class="m m-put">PUT</b></td><td><code>/uploads/{upload_id}?offset=N</code></td><td><span data-lang="en">Send the next chunk of a resumable upload.</span><span data-lang="zh">断点续传：发送下一块数据。</span></td></tr>
+                <tr><td><b class="m m-post">POST</b></td><td><code>/texts</code></td><td><span data-lang="en">Share text: <code>{"text": "…"}</code>. Returns <code>201</code> and the share.</span><span data-lang="zh">分享文字：<code>{"text": "…"}</code>。返回 <code>201</code> 和分享信息。</span></td></tr>
+                <tr><td><b class="m m-get">GET</b></td><td><code>/shares</code></td><td><span data-lang="en">Shares created with this key that are still valid, newest first. <code>?limit=</code> 1–1000 (default 100), <code>?offset=</code>.</span><span data-lang="zh">用这个密钥创建、仍然有效的分享，新的在前。<code>?limit=</code> 1–1000（默认 100），<code>?offset=</code> 分页。</span></td></tr>
+                <tr><td><b class="m m-get">GET</b></td><td><code>/shares/{token}</code></td><td><span data-lang="en">One share by its link token. Text shares include the text.</span><span data-lang="zh">按链接里的 token 查一个分享；文字分享会附上正文。</span></td></tr>
+                <tr><td><b class="m m-del">DELETE</b></td><td><code>/shares/{token}</code></td><td><span data-lang="en">Delete a share created with this key. Returns <code>204</code>.</span><span data-lang="zh">删除用这个密钥创建的分享。返回 <code>204</code>。</span></td></tr>
+                <tr><td><b class="m m-get">GET</b></td><td><code>/codes/{code}</code></td><td><span data-lang="en">Find a share by its 4-digit code. Wrong codes count toward the per-IP limit, as on the website.</span><span data-lang="zh">按 4 位提取码查分享。输错的次数与网页一样按 IP 计入限制。</span></td></tr>
+                <tr><td><b class="m m-get">GET</b></td><td><code>/download/{token}</code></td><td><span data-lang="en">Download the file. This is the share's <code>download_url</code>; it is not under <code>/api/v1</code> and needs no key.</span><span data-lang="zh">下载文件，即分享里的 <code>download_url</code>。不在 <code>/api/v1</code> 下，不需要密钥。</span></td></tr>
+              </tbody>
+            </table></div>
+
+            <h3 data-i18n="admin.apiDocExamples">Examples</h3>
+            <p data-lang="en">Upload a file:</p><p data-lang="zh">上传文件：</p>
+<pre class="api-code">curl -H "Authorization: Bearer $SHAREWEB_KEY" -F "file=@photo.jpg" $SHAREWEB_URL/api/v1/files</pre>
+            <p data-lang="en">The reply is a share object (the same shape every endpoint returns):</p><p data-lang="zh">返回一个分享对象（所有接口返回的分享都是这个格式）：</p>
+<pre class="api-code">{
+  "token": "Qm9sZC1h…", "code": "4821", "type": "file",
+  "filename": "photo.jpg", "size": 482113, "sha256": "9f2c…", "mime_type": "image/jpeg",
+  "created_at": "2026-11-09T04:10:00+00:00", "expires_at": "2026-12-09T04:10:00+00:00",
+  "locked": false, "download_count": 0, "owned": true,
+  "url": "<span class="api-origin"></span>/share/Qm9sZC1h…",
+  "download_url": "<span class="api-origin"></span>/download/Qm9sZC1h…"
+}</pre>
+            <p data-lang="en">Share text, look up a code, download:</p><p data-lang="zh">分享文字、按提取码查找、下载文件：</p>
+<pre class="api-code">curl -H "Authorization: Bearer $SHAREWEB_KEY" -H "Content-Type: application/json" \
+     -d '{"text": "hello"}' $SHAREWEB_URL/api/v1/texts
+
+curl -H "Authorization: Bearer $SHAREWEB_KEY" $SHAREWEB_URL/api/v1/codes/4821
+
+curl -OJ "$SHAREWEB_URL/download/&lt;token&gt;"</pre>
+            <p data-lang="en">List and delete your shares:</p><p data-lang="zh">列出、删除自己的分享：</p>
+<pre class="api-code">curl -H "Authorization: Bearer $SHAREWEB_KEY" "$SHAREWEB_URL/api/v1/shares?limit=20"
+
+curl -X DELETE -H "Authorization: Bearer $SHAREWEB_KEY" $SHAREWEB_URL/api/v1/shares/&lt;token&gt;</pre>
+
+            <h3 data-i18n="admin.apiDocResume">Resumable upload (large files)</h3>
+            <ol data-lang="en">
+              <li>Compute the file's SHA-256 and <code>POST /uploads</code> with <code>{"sha256", "size", "filename"}</code>. If the server already has the same file, the reply is <code>{"exists": true, "share": {…}}</code> and you're done.</li>
+              <li>Otherwise you get <code>{"upload_id", "offset", "max_chunk"}</code>. <code>PUT</code> the file's bytes starting at <code>offset</code> to <code>/uploads/{upload_id}?offset=N</code>, in chunks of up to <code>max_chunk</code> (8 MB is a good size). Each reply gives the new <code>offset</code>. After the last chunk the server checks the SHA-256 and replies <code>{"done": true, "share": {…}}</code>.</li>
+              <li>If the upload is interrupted, send the same <code>POST /uploads</code> again with <code>"upload_id"</code> added; the reply tells you where to continue. A <code>409</code> reply also contains the right <code>offset</code>. Unfinished uploads are kept for 24 hours and can only be continued with the key that started them.</li>
+            </ol>
+            <ol data-lang="zh">
+              <li>先算出文件的 SHA-256，<code>POST /uploads</code>，内容为 <code>{"sha256", "size", "filename"}</code>。服务器上已有相同文件时直接返回 <code>{"exists": true, "share": {…}}</code>，不用再传。</li>
+              <li>否则返回 <code>{"upload_id", "offset", "max_chunk"}</code>。从 <code>offset</code> 处开始，把文件内容分块 <code>PUT</code> 到 <code>/uploads/{upload_id}?offset=N</code>，每块不超过 <code>max_chunk</code>（8 MB 比较合适）。每次返回新的 <code>offset</code>；最后一块收齐后服务器校验 SHA-256，返回 <code>{"done": true, "share": {…}}</code>。</li>
+              <li>上传中断后，再发一次同样的 <code>POST /uploads</code> 并带上 <code>"upload_id"</code>，返回值告诉你从哪里继续。返回 <code>409</code> 时也会带上正确的 <code>offset</code>。未完成的上传保留 24 小时，只能用开始它的那个密钥继续。</li>
+            </ol>
+            <p data-lang="en">A complete Python example (needs <code>pip install requests</code>):</p><p data-lang="zh">完整的 Python 示例（需要 <code>pip install requests</code>）：</p>
+<pre class="api-code">import hashlib, os, sys, requests
+
+API = os.environ["SHAREWEB_URL"] + "/api/v1"
+H = {"Authorization": "Bearer " + os.environ["SHAREWEB_KEY"]}
+CHUNK = 8 * 1024 * 1024
+
+def upload(path, upload_id=None):
+    sha = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 &lt;&lt; 20), b""):
+            sha.update(block)
+    r = requests.post(API + "/uploads", headers=H, json={
+        "sha256": sha.hexdigest(), "size": os.path.getsize(path),
+        "filename": os.path.basename(path), "upload_id": upload_id})
+    r.raise_for_status()
+    d = r.json()
+    if d["exists"]:
+        return d["share"]
+    offset = d["offset"]
+    with open(path, "rb") as f:
+        while True:
+            f.seek(offset)
+            r = requests.put(f"{API}/uploads/{d['upload_id']}", headers=H,
+                             params={"offset": offset}, data=f.read(CHUNK))
+            if r.status_code == 409:      # server has a different offset: continue from there
+                offset = r.json()["offset"]
+                continue
+            r.raise_for_status()
+            step = r.json()
+            if step["done"]:
+                return step["share"]
+            offset = step["offset"]
+
+share = upload(sys.argv[1])
+print(share["code"], share["url"])</pre>
+
+            <h3 data-i18n="admin.apiDocFields">Share fields</h3>
+            <div class="api-table-wrap"><table class="api-table">
+              <tbody>
+                <tr><td><code>token</code></td><td><span data-lang="en">ID in the share link; use it with <code>/shares/{token}</code> and <code>/download/{token}</code>.</span><span data-lang="zh">分享链接里的 ID，用于 <code>/shares/{token}</code> 和 <code>/download/{token}</code>。</span></td></tr>
+                <tr><td><code>code</code></td><td><span data-lang="en">4-digit share code.</span><span data-lang="zh">4 位提取码。</span></td></tr>
+                <tr><td><code>type</code></td><td><span data-lang="en"><code>file</code> or <code>text</code>.</span><span data-lang="zh"><code>file</code>（文件）或 <code>text</code>（文字）。</span></td></tr>
+                <tr><td><code>filename</code>, <code>size</code>, <code>sha256</code>, <code>mime_type</code></td><td><span data-lang="en">File name, size in bytes, SHA-256, content type.</span><span data-lang="zh">文件名、大小（字节）、SHA-256、文件类型。</span></td></tr>
+                <tr><td><code>created_at</code>, <code>expires_at</code></td><td><span data-lang="en">ISO 8601 times in UTC. <code>expires_at</code> is <code>null</code> while the admin has locked the share.</span><span data-lang="zh">ISO 8601 格式的 UTC 时间。管理员锁定期间 <code>expires_at</code> 为 <code>null</code>（不过期）。</span></td></tr>
+                <tr><td><code>locked</code>, <code>download_count</code></td><td><span data-lang="en">Locked by the admin (can't be deleted through the API); number of downloads.</span><span data-lang="zh">是否被管理员锁定（锁定的不能通过 API 删除）；下载次数。</span></td></tr>
+                <tr><td><code>url</code>, <code>download_url</code></td><td><span data-lang="en">Share page link; direct download link (files only, no key needed).</span><span data-lang="zh">分享页链接；文件直链（仅文件，不需要密钥）。</span></td></tr>
+                <tr><td><code>owned</code></td><td><span data-lang="en">Created with this key. Only these appear in <code>/shares</code> and can be deleted. Uploading a file the server already has returns the existing share, which may not be yours.</span><span data-lang="zh">是否由当前密钥创建。只有这些会出现在 <code>/shares</code> 里、可以删除。上传服务器上已有的文件时会返回已有的那个分享，它可能不是你创建的。</span></td></tr>
+                <tr><td><code>text</code></td><td><span data-lang="en">Text shares only, returned by <code>/shares/{token}</code> and <code>/codes/{code}</code>.</span><span data-lang="zh">仅文字分享，在 <code>/shares/{token}</code> 和 <code>/codes/{code}</code> 中返回。</span></td></tr>
+              </tbody>
+            </table></div>
+
+            <h3 data-i18n="admin.apiDocErrors">Status codes</h3>
+            <div class="api-table-wrap"><table class="api-table">
+              <tbody>
+                <tr><td><code>200</code> <code>201</code> <code>204</code></td><td><span data-lang="en">Success (201: created, 204: deleted).</span><span data-lang="zh">成功（201：已创建，204：已删除）。</span></td></tr>
+                <tr><td><code>400</code></td><td><span data-lang="en">Malformed request or upload.</span><span data-lang="zh">请求或上传的数据格式不对。</span></td></tr>
+                <tr><td><code>401</code></td><td><span data-lang="en">Missing, wrong or deleted API key.</span><span data-lang="zh">没带密钥、密钥错误或已被删除。</span></td></tr>
+                <tr><td><code>403</code></td><td><span data-lang="en">Your IP is blacklisted.</span><span data-lang="zh">IP 在黑名单中。</span></td></tr>
+                <tr><td><code>404</code></td><td><span data-lang="en">Not found, expired, not created by this key, or wrong code (the reply includes <code>fail_count</code>).</span><span data-lang="zh">不存在、已过期、不是这个密钥创建的，或提取码错误（返回中带 <code>fail_count</code> 已错次数）。</span></td></tr>
+                <tr><td><code>409</code></td><td><span data-lang="en">Upload offset doesn't match (the reply includes the right <code>offset</code>), or the share is locked by the admin.</span><span data-lang="zh">上传的 offset 不对（返回中带正确的 <code>offset</code>），或分享已被管理员锁定。</span></td></tr>
+                <tr><td><code>413</code></td><td><span data-lang="en">File, text or chunk too large.</span><span data-lang="zh">文件、文字或单块太大。</span></td></tr>
+                <tr><td><code>422</code></td><td><span data-lang="en">Invalid parameters, or the uploaded data didn't match its SHA-256 (the upload is discarded; start over).</span><span data-lang="zh">参数不对，或上传的内容与 SHA-256 不符（这次上传作废，需重新开始）。</span></td></tr>
+                <tr><td><code>429</code></td><td><span data-lang="en">Too many wrong codes; try again after <code>cooldown_until</code>.</span><span data-lang="zh">提取码错太多次，<code>cooldown_until</code> 之后再试。</span></td></tr>
+                <tr><td><code>507</code></td><td><span data-lang="en">Not enough disk space on the server.</span><span data-lang="zh">服务器磁盘空间不足。</span></td></tr>
+              </tbody>
+            </table></div>
+          </section>
+        </div>
+
         <!-- 管理员密码 -->
         <div class="admin-view" data-view="password">
           <section class="card">
@@ -253,6 +404,6 @@
     </div>
   </main>
   <div class="chart-tip hidden" id="chartTip" role="status"></div>
-  <script src="/static/js/admin.js?v=20261108-4"></script>
+  <script src="/static/js/admin.js?v=20261109-1"></script>
 </body>
 </html>
