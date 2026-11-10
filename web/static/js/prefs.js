@@ -133,12 +133,28 @@
     document.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
   }
 
+  // 换主题时整页颜色渐变过渡: 支持 View Transitions 的浏览器做整页淡入淡出 (渐变背景、图片也一起过渡),
+  // 其他浏览器临时给所有元素加颜色过渡 (html.theme-fade, 见 app.css)。系统设置了「减少动态效果」时直接切换。
+  let fadeTimer = 0;
+  function fadeTheme(change) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return change();
+    if (document.startViewTransition) {
+      try { document.startViewTransition(change); return; } catch (e) {}
+    }
+    root.classList.add('theme-fade');
+    change();
+    clearTimeout(fadeTimer);
+    fadeTimer = setTimeout(() => root.classList.remove('theme-fade'), 450);
+  }
+
   // 跟随系统 → 亮色 → 暗色 → 跟随系统
   function toggleTheme() {
     theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
-    if (theme === 'system') delete root.dataset.theme; else root.dataset.theme = theme;
     store.set('sw-theme', theme);
-    renderToggles();
+    fadeTheme(() => {
+      if (theme === 'system') delete root.dataset.theme; else root.dataset.theme = theme;
+      renderToggles();
+    });
   }
 
   function setLayout(l) {

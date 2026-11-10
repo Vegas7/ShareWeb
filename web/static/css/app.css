@@ -52,6 +52,10 @@
   --switch-thumb:#3b4560; --switch-thumb-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 8px rgba(0,0,0,.55); --switch-on:#fff;
   color-scheme:dark;
 }
+/* 切换主题时的渐变过渡 (prefs.js 的 fadeTheme): 支持 View Transitions 的浏览器整页淡入淡出,
+   其他浏览器在切换的瞬间给所有元素临时加颜色过渡 */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.4s;animation-timing-function:ease}
+html.theme-fade,html.theme-fade *,html.theme-fade *::before,html.theme-fade *::after{transition:background-color .4s ease,color .4s ease,border-color .4s ease,box-shadow .4s ease,fill .4s ease,stroke .4s ease!important}
 /* 提取码数字字体: Tilt Neon (SIL OFL), 自托管, 仅含 0-9 子集 (约 2KB) */
 @font-face{font-family:"Tilt Neon";font-style:normal;font-weight:400;font-display:swap;src:url(/static/fonts/tilt-neon-digits.woff2) format("woff2");unicode-range:U+30-39}
 *{box-sizing:border-box}
