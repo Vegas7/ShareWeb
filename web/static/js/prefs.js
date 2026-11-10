@@ -133,14 +133,12 @@
     document.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
   }
 
-  // 换主题时整页颜色渐变过渡: 支持 View Transitions 的浏览器做整页淡入淡出 (渐变背景、图片也一起过渡),
-  // 其他浏览器临时给所有元素加颜色过渡 (html.theme-fade, 见 app.css)。系统设置了「减少动态效果」时直接切换。
+  // 换主题时颜色渐变过渡: 切换的瞬间给所有元素临时加颜色过渡 (html.theme-fade, 见 app.css)。
+  // 不用 View Transitions 整页淡入淡出: 过渡期间点击全落在 <html> 上, 快速连点主题按钮会点不中, 还会选中附近的文字。
+  // 系统设置了「减少动态效果」时直接切换。
   let fadeTimer = 0;
   function fadeTheme(change) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return change();
-    if (document.startViewTransition) {
-      try { document.startViewTransition(change); return; } catch (e) {}
-    }
     root.classList.add('theme-fade');
     change();
     clearTimeout(fadeTimer);
