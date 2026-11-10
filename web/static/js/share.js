@@ -4,7 +4,6 @@ I18N.add({
     'share.textName': 'Text content',
     'share.validUntil': 'Valid until {d}',
     'share.textTitle': 'Text share ✓',
-    'share.clickSelect': 'Click to select all',
     'share.sha': 'SHA-256 checksum',
     'share.code': 'Share code',
     'share.clickToCopy': 'Click to copy',
@@ -57,7 +56,6 @@ I18N.add({
     'share.textName': '文本内容',
     'share.validUntil': '有效至 {d}',
     'share.textTitle': '文字共享 ✓',
-    'share.clickSelect': '点击可全选',
     'share.sha': 'SHA-256 校验码',
     'share.code': '提取码',
     'share.clickToCopy': '点击复制',
@@ -264,14 +262,12 @@ function renderText(d, exp) {
       <h2>${S('share.textTitle')}</h2>
       <p><span class="meta">${S('share.validUntil', { d: exp })}</span></p>
       ${codeBlock(d)}
-      <div id="textContent" class="text-content" data-i18n-title="share.clickSelect" title="${esc(t('share.clickSelect'))}">${esc(d.text || '')}</div>
+      <div id="textContent" class="text-content">${esc(d.text || '')}</div>
       ${shaBlock(d.sha256)}
       <button class="primary accent wide" id="copyTextBtn" data-i18n="share.copyText">${esc(t('share.copyText'))}</button>
     </div>`;
   bindCodeAndSha(d);
   document.querySelector('#copyTextBtn').onclick = e => { copy(d.text || ''); flash(e.currentTarget, 'share.copiedText', 'share.copyText'); };
-  const tBox = document.querySelector('#textContent');
-  tBox.onclick = () => { const sel = window.getSelection(), rg = document.createRange(); rg.selectNodeContents(tBox); sel.removeAllRanges(); sel.addRange(rg); };
 }
 
 function renderImage(d, filename, exp) {

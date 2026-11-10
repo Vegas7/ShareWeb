@@ -281,7 +281,7 @@ button,.button{font:inherit}
 .center{text-align:center}
 .back{display:inline-block;margin-bottom:16px;color:var(--accent);text-decoration:none;font-weight:600}
 .back:hover{text-decoration:underline}
-.text-content{white-space:pre-wrap;word-break:break-word;background:var(--field);border:1px solid var(--card-border);border-radius:12px;padding:16px;cursor:pointer;max-height:70vh;overflow:auto;font-size:14px}
+.text-content{white-space:pre-wrap;word-break:break-word;background:var(--field);border:1px solid var(--card-border);border-radius:12px;padding:16px;cursor:text;max-height:70vh;overflow:auto;font-size:14px}
 /* encrypted download block */
 .enc-box{margin-top:20px;border-top:1px solid var(--card-border);padding-top:18px}
 .enc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between}
