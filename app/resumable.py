@@ -105,11 +105,18 @@ def open_session(sha256: str, size: int, filename: str, content_type: str | None
     """
     now = iso(utcnow())
     row = None
+    stale_id = None
     if upload_id:
         row = _get(upload_id)
     elif batch_id:
         with connect() as conn:
             row = conn.execute("SELECT * FROM uploads WHERE batch_id=? AND seq=?", (batch_id, seq)).fetchone()
+        # 同一批次、同一位置上的文件被换成了另一个 (名字/大小相同但内容变了):
+        # 先记下旧会话, 建好新会话后再删, 否则打包时两个版本都会被装进 zip。
+        if row and not (row["sha256"] == sha256 and row["size"] == size
+                        and row["api_key_id"] == api_key_id and (row["batch_id"] or None) == batch_id):
+            stale_id = row["id"]
+            row = None
     if (row and row["sha256"] == sha256 and row["size"] == size and row["api_key_id"] == api_key_id
             and (row["batch_id"] or None) == (batch_id or None)):
         if row["completed"]:
@@ -137,6 +144,8 @@ def open_session(sha256: str, size: int, filename: str, content_type: str | None
     for r in extra:
         if not (_locks.get(r["id"]) and _locks[r["id"]].locked()):
             discard(r["id"])
+    if stale_id and not (_locks.get(stale_id) and _locks[stale_id].locked()):
+        discard(stale_id)
     return new_id, 0
 
 
