@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from .config import settings
 from .database import connect
 from .security import iso, utcnow
-from .storage import DiskFull, UploadTooLarge, shard_dir, write_chunk
+from .storage import DiskFull, UploadTooLarge, safe_delete, shard_dir, write_chunk
 from . import app_settings
 
 logger = logging.getLogger(__name__)
@@ -66,22 +66,54 @@ def _get(upload_id: str):
 
 
 def discard(upload_id: str):
+    """删除上传会话: 未收齐的半成品、已暂存的文件和会话记录都不留。"""
     with connect() as conn:
+        row = conn.execute("SELECT batch_id, rel_path FROM uploads WHERE id=?", (upload_id,)).fetchone()
         conn.execute("DELETE FROM uploads WHERE id=?", (upload_id,))
+        if row and row["batch_id"]:
+            # 批次里最后一个会话被丢掉时, 批次本身也没有存在的意义了
+            left = conn.execute("SELECT 1 FROM uploads WHERE batch_id=? LIMIT 1", (row["batch_id"],)).fetchone()
+            if not left:
+                conn.execute("DELETE FROM batches WHERE id=?", (row["batch_id"],))
     _hashes.pop(upload_id, None)
     try:
         part_path(upload_id).unlink()
     except FileNotFoundError:
         pass
+    if row and row["rel_path"]:
+        safe_delete(row["rel_path"])
+
+
+def is_completed(upload_id: str) -> bool:
+    """会话是否已收齐 (多文件上传里表示文件已暂存, 可以打包了)。"""
+    row = _get(upload_id)
+    return bool(row and row["completed"])
+
+
+def stage_empty(upload_id: str):
+    """0 字节文件不会走到 receive_chunk, 建立会话时就直接标记为已收齐。"""
+    _complete(upload_id, staged=True)
 
 
 def open_session(sha256: str, size: int, filename: str, content_type: str | None, ip: str,
-                 upload_id: str | None = None, api_key_id: int | None = None) -> tuple[str, int]:
+                 upload_id: str | None = None, api_key_id: int | None = None,
+                 batch_id: str | None = None, seq: int | None = None) -> tuple[str, int]:
     """返回 (upload_id, 已收字节数)。upload_id 对应的会话与本次文件一致 (且是同一个 API 密钥 / 都来自网页) 时续传,
-    否则新建会话。"""
+    否则新建会话。
+
+    batch_id/seq 用于多文件上传: 同一批次里位置相同的会话按 (sha256, size) 认领, 实现整批续传。
+    """
     now = iso(utcnow())
-    row = _get(upload_id) if upload_id else None
-    if row and row["sha256"] == sha256 and row["size"] == size and row["api_key_id"] == api_key_id:
+    row = None
+    if upload_id:
+        row = _get(upload_id)
+    elif batch_id:
+        with connect() as conn:
+            row = conn.execute("SELECT * FROM uploads WHERE batch_id=? AND seq=?", (batch_id, seq)).fetchone()
+    if (row and row["sha256"] == sha256 and row["size"] == size and row["api_key_id"] == api_key_id
+            and (row["batch_id"] or None) == (batch_id or None)):
+        if row["completed"]:
+            return row["id"], size
         path = part_path(row["id"])
         offset = _part_size(path)
         if offset is None or offset > size:
@@ -95,11 +127,13 @@ def open_session(sha256: str, size: int, filename: str, content_type: str | None
     new_id = secrets.token_hex(16)
     open(part_path(new_id), "xb").close()
     with connect() as conn:
-        conn.execute("INSERT INTO uploads (id, sha256, size, filename, content_type, ip, created_at, updated_at, api_key_id) "
-                     "VALUES (?,?,?,?,?,?,?,?,?)", (new_id, sha256, size, filename, content_type, ip, now, now, api_key_id))
-        # 每个 IP 最多保留若干个未完成的会话, 多出来的从最久没动的开始丢弃
-        extra = conn.execute("SELECT id FROM uploads WHERE ip=? ORDER BY updated_at DESC LIMIT -1 OFFSET ?",
-                             (ip, MAX_SESSIONS_PER_IP)).fetchall()
+        conn.execute("INSERT INTO uploads (id, sha256, size, filename, content_type, ip, created_at, updated_at, "
+                     "api_key_id, batch_id, seq) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                     (new_id, sha256, size, filename, content_type, ip, now, now, api_key_id, batch_id, seq))
+        # 每个 IP 最多保留若干个未完成的单文件会话, 多出来的从最久没动的开始丢弃
+        # (多文件批次的会话不受这个上限约束, 否则 50 个文件的批次会把自己的会话挤掉)
+        extra = conn.execute("SELECT id FROM uploads WHERE ip=? AND batch_id IS NULL ORDER BY updated_at DESC "
+                             "LIMIT -1 OFFSET ?", (ip, MAX_SESSIONS_PER_IP)).fetchall()
     for r in extra:
         if not (_locks.get(r["id"]) and _locks[r["id"]].locked()):
             discard(r["id"])
@@ -131,17 +165,26 @@ def _touch(upload_id: str):
         conn.execute("UPDATE uploads SET updated_at=? WHERE id=?", (iso(utcnow()), upload_id))
 
 
-def _complete(upload_id: str) -> tuple[str, str]:
-    """把收齐的文件移到正式位置并删除会话, 返回 (stored_name, rel_path)。"""
+def _complete(upload_id: str, staged: bool = False) -> tuple[str, str]:
+    """把收齐的文件移到正式位置并返回 (stored_name, rel_path)。
+
+    staged=True 时保留 uploads 行 (completed=1, 记下 stored_name/rel_path), 文件先暂存,
+    等多文件上传整批打包后再删; 否则删除会话 (单文件上传立即建分享)。
+    """
     path = part_path(upload_id)
     with open(path, "rb+") as f:
         os.fsync(f.fileno())
     stored_name = secrets.token_hex(16) + ".share"
     final = shard_dir(stored_name) / stored_name
     os.replace(path, final)
+    rel_path = str(final.relative_to(settings.data_dir))
     with connect() as conn:
-        conn.execute("DELETE FROM uploads WHERE id=?", (upload_id,))
-    return stored_name, str(final.relative_to(settings.data_dir))
+        if staged:
+            conn.execute("UPDATE uploads SET completed=1, stored_name=?, rel_path=?, updated_at=? WHERE id=?",
+                         (stored_name, rel_path, iso(utcnow()), upload_id))
+        else:
+            conn.execute("DELETE FROM uploads WHERE id=?", (upload_id,))
+    return stored_name, rel_path
 
 
 async def receive_chunk(upload_id: str, offset: int, stream, on_disk_full=None, api_key_id: int | None = None):
@@ -216,7 +259,7 @@ async def receive_chunk(upload_id: str, offset: int, stream, on_disk_full=None, 
         if sha.hexdigest() != row["sha256"]:
             await run_in_threadpool(discard, upload_id)
             raise ChecksumMismatch(upload_id)
-        return row, total, await run_in_threadpool(_complete, upload_id)
+        return row, total, await run_in_threadpool(_complete, upload_id, bool(row["batch_id"]))
 
 
 def cleanup_stale(hours: int = RESUME_HOURS) -> int:
@@ -238,6 +281,17 @@ def cleanup_stale(hours: int = RESUME_HOURS) -> int:
             continue
         try:
             if path.stat().st_mtime < orphan_cutoff:
+                path.unlink()
+                removed += 1
+        except OSError:
+            pass
+    # 多文件上传: 没有会话的批次记录, 以及打包中途崩溃留下的 zip 临时文件
+    with connect() as conn:
+        conn.execute("DELETE FROM batches WHERE updated_at<? AND id NOT IN "
+                     "(SELECT batch_id FROM uploads WHERE batch_id IS NOT NULL)", (cutoff,))
+    for path in settings.data_dir.glob(".zip-*"):
+        try:
+            if path.is_file() and path.stat().st_mtime < orphan_cutoff:
                 path.unlink()
                 removed += 1
         except OSError:

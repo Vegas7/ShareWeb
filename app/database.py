@@ -92,6 +92,21 @@ CREATE TABLE IF NOT EXISTS uploads (
     ip TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
+    api_key_id INTEGER,
+    -- 多文件上传 (见 batches.py): 同一批次的文件共用一个 batch_id, seq 是批次内的顺序
+    batch_id TEXT,
+    seq INTEGER,
+    -- 已收齐并暂存 (stored_name / rel_path 指向 data 里的正式文件), 等整批打包后删除
+    completed INTEGER NOT NULL DEFAULT 0,
+    stored_name TEXT,
+    rel_path TEXT
+);
+-- 多文件上传批次: 全部文件收齐后由 batches.py 打包成一个 zip 分享
+CREATE TABLE IF NOT EXISTS batches (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    ip TEXT,
     api_key_id INTEGER
 );
 -- 外部 API 的密钥 (见 apikeys.py)。只存 SHA-256, 明文只在创建时显示一次
@@ -123,6 +138,11 @@ _ADDED_COLUMNS = {
     },
     "uploads": {
         "api_key_id": "INTEGER",
+        "batch_id": "TEXT",
+        "seq": "INTEGER",
+        "completed": "INTEGER NOT NULL DEFAULT 0",
+        "stored_name": "TEXT",
+        "rel_path": "TEXT",
     },
 }
 
@@ -137,3 +157,5 @@ def init_db():
                 if name not in existing:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_shares_api_key ON shares(api_key_id)")
+        # 多文件上传: 按批次顺序取暂存文件 (列是后加的, 索引必须放在 ALTER 之后建)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_uploads_batch ON uploads(batch_id, seq)")

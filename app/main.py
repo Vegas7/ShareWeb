@@ -26,12 +26,12 @@ from .services import (SPECIAL_CODE, RedeemBlocked, cleanup_expired, cleanup_old
                        delete_files, evict_for_space, evictable_files, get_active_file_by_sha256, get_github_download_url,
                        get_share_by_token, list_files, log_event, mirror_to_github, redeem_code, set_files_locked, share_status,
                        touch_download)
-from .storage import save_upload_stream, save_text, cleanup_stale_uploads, UploadTooLarge, BadUpload, DiskFull
+from .storage import save_upload_stream, save_text, cleanup_stale_uploads, UploadTooLarge, BadUpload, DiskFull, safe_delete
 from . import crypto
 from . import github_mirror
 from . import geoip, visitors
 from . import app_settings
-from . import resumable
+from . import batches, resumable
 from . import api_v1, apikeys, llm_doc
 from .shareops import (share_payload as _share_payload, ensure_space as _ensure_space, disk_full_handler as _disk_full_handler,
                        create_file_share as _create_file_share, resolve_share_path as _resolve_share_path)
@@ -125,6 +125,17 @@ class UploadInitRequest(BaseModel):
     filename: str = Field(default="", max_length=4096)
     content_type: Optional[str] = Field(default=None, max_length=200)
     upload_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+
+class BatchFile(BaseModel):
+    sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    size: int = Field(ge=0)
+    filename: str = Field(default="", max_length=4096)
+    content_type: Optional[str] = Field(default=None, max_length=200)
+
+class BatchInitRequest(BaseModel):
+    files: list[BatchFile] = Field(min_length=1, max_length=batches.MAX_FILES)
+    # 整批续传: 带上上次的 batch_id 时, 已传完/传到一半的文件会被认领
+    batch_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{32}$")
 
 class TextShareRequest(BaseModel):
     text: str = Field(min_length=1)
@@ -235,9 +246,45 @@ async def upload_chunk(upload_id: str, offset: int, request: Request, background
         return Response(status_code=400)
     if not done:
         return {"done": False, "offset": received}
+    if row["batch_id"]:
+        # 多文件上传: 文件先暂存, 等整批收齐后由 /api/batch/{id}/complete 统一打包
+        return {"done": True, "staged": True}
     stored_name, rel_path = done
     return {"done": True, **_create_file_share(request, background, row["filename"], row["content_type"],
                                                received, row["sha256"], stored_name, rel_path, ip)}
+
+@app.post("/api/batch/init")
+async def batch_init(request: Request, payload: BatchInitRequest):
+    """多文件上传第一步: 为每个文件建立 (或找回) 上传会话, 之后仍用 PUT /api/upload/{id} 传分块。"""
+    ip = ensure_not_blacklisted(request)
+    files = [{"sha256": f.sha256.lower(), "size": f.size, "filename": f.filename,
+              "content_type": f.content_type} for f in payload.files]
+    return await run_in_threadpool(batches.init_batch, files, ip, None, payload.batch_id)
+
+@app.post("/api/batch/{batch_id}/complete")
+async def batch_complete(batch_id: str, request: Request, background: BackgroundTasks):
+    """多文件上传最后一步: 把暂存的文件打包成一个 zip, 建成一个普通文件分享。"""
+    ip = ensure_not_blacklisted(request)
+    if len(batch_id) != 32 or any(c not in "0123456789abcdef" for c in batch_id):
+        raise HTTPException(404, "batch not found")
+    need, count = await run_in_threadpool(batches.staged_size, batch_id)
+    if not count:
+        raise HTTPException(404, "batch not found")
+    await _ensure_space(need, ip)  # 打包时磁盘上会同时存在暂存文件和 zip
+    staged = await run_in_threadpool(batches.build_zip, batch_id)
+    try:
+        payload = _create_file_share(request, background, staged["filename"], "application/zip",
+                                     staged["size"], staged["sha256"], staged["stored_name"],
+                                     staged["rel_path"], ip)
+    except BaseException:
+        safe_delete(staged["rel_path"])
+        raise
+    finally:
+        await run_in_threadpool(batches.finish, batch_id)
+    log_event(ip, "UPLOAD_BATCH", "SUCCESS", payload["id"],
+              f"FILES={staged['count']} SIZE={staged['size']} SHA256={staged['sha256']} CODE={payload['code']}",
+              request.headers.get("user-agent", "-"))
+    return payload
 
 @app.post("/api/upload")
 async def upload_file(request: Request, background: BackgroundTasks):

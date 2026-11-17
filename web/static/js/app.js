@@ -10,6 +10,21 @@ I18N.add({
     'upload.hashing':'正在计算 SHA-256…','upload.hashPct':'计算校验码 {p}%','upload.dupFound':'发现服务器已有相同文件','upload.hashFailed':'无法计算 SHA-256，改为普通上传（不支持断点续传）…','upload.resumePct':'断点续传 {p}%','upload.retrying':'网络中断，{s} 秒后重试（已上传 {p}%）','upload.interrupted':'上传中断（已上传 {p}%），重新选择同一个文件即可从断点继续','upload.checksum':'校验失败：文件在上传过程中被修改，请重新上传','upload.uploading':'上传中…','upload.pct':'上传 {p}%','upload.failed':'上传失败：{msg}','net.error':'网络错误','text.failed':'生成失败',
     'redeem.need4':'请输入4位数字提取码','redeem.cooldown':'提取失败次数过多，请于 {t} 后重试','redeem.blacklisted':'当前IP已被加入黑名单','redeem.wrong':'提取码错误，已失败 {n} 次'}
 });
+// 多文件上传: 覆盖首页文案, 并补充批量进度用的文案
+I18N.add({
+  en:{'index.dropTitle':'Drop files here','index.pick':'Choose files',
+    'index.dropHint':'Or click to choose one or more files (multiple files are packed into one zip), or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste text, an image or a file',
+    'upload.batchHash':'Packing {n} files · checksum {i}/{n} · {p}%','upload.batchUpload':'Uploading {i}/{n}: {name} · {p}%',
+    'upload.batchPacking':'Packing {n} files into one zip…','upload.batchTooLarge':'The selected files total more than the {size} limit',
+    'upload.batchHashFailed':'Could not compute checksums, please try again','upload.batchInterrupted':'Batch upload interrupted at {p}%. Choose the same files again to continue',
+    'upload.batchTooMany':'At most {n} files at once'},
+  zh:{'index.dropTitle':'拖放文件到这里','index.pick':'选择文件',
+    'index.dropHint':'也可以点击选择一个或多个文件（多个文件会自动打包成一个 zip），或直接 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴文字、图片或文件',
+    'upload.batchHash':'准备打包 {n} 个文件 · 计算校验码 {i}/{n} · {p}%','upload.batchUpload':'上传 {i}/{n}：{name} · {p}%',
+    'upload.batchPacking':'正在把 {n} 个文件打包成 zip…','upload.batchTooLarge':'所选文件合计超过上限 {size}',
+    'upload.batchHashFailed':'无法计算校验码，请重试','upload.batchInterrupted':'批量上传中断（已完成 {p}%），重新选择同一批文件可继续',
+    'upload.batchTooMany':'一次最多选择 {n} 个文件'}
+});
 const t=I18N.t,S=I18N.span,D=I18N.dateSpan,setKey=I18N.setKey;
 const $=s=>document.querySelector(s);const input=$('#fileInput'),pick=$('#pickBtn'),drop=$('#dropzone'),paste=$('#pasteArea'),textBtn=$('#textShareBtn');
 async function getHistory(){const db=await openDB();return new Promise((resolve,reject)=>{const r=db.transaction('items').objectStore('items').getAll();r.onsuccess=()=>resolve(r.result.sort((a,b)=>b.added_at.localeCompare(a.added_at)));r.onerror=()=>reject(r.error)})}
@@ -87,6 +102,80 @@ async function upload(file){if(!file)return;const seq=++uploadSeq;$('#progressWr
 // 算不出 SHA-256 时的后备: 整个文件一次传完, 不能续传
 function uploadWhole(file){const fd=new FormData();fd.append('file',file);const xhr=new XMLHttpRequest();xhr.open('POST','/api/upload');xhr.upload.onprogress=e=>{if(e.lengthComputable)setProgress(e.loaded/e.total*100,'upload.pct')};xhr.onload=()=>{if(xhr.status===200)showResult(JSON.parse(xhr.responseText));else uploadFailed(xhr.status,xhr.responseText)};xhr.onerror=()=>setKey($('#progressText'),'net.error');xhr.send(fd)}
 function uploadFailed(status,msg){if(status===413)setKey($('#progressText'),'upload.tooLarge',{size:uploadLimit?fmtLimit(uploadLimit):'?'});else if(status===507)setKey($('#progressText'),'upload.noSpace');else if(status===422)setKey($('#progressText'),'upload.checksum');else setKey($('#progressText'),'upload.failed',{msg:msg||status})}
+
+// ---- 多文件上传: 服务器把整批文件打包成一个 zip ----
+// 选一个文件走原来的单文件流程; 选多个时每个文件仍按断点续传上传 (逐个), 全部收齐后让服务器打包。
+function uploadAll(files){const list=[...(files||[])];if(!list.length)return;if(list.length===1){upload(list[0]);return}uploadBatch(list)}
+const MAX_BATCH=50;  // 与后端 app/batches.py 的 MAX_FILES 保持一致
+const postJSON=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>({status:r.status,data:await r.json().catch(()=>({}))}));
+// 整批续传的 key: 用文件个数、总大小和第一个文件的哈希识别「同一批文件」
+const batchKey=metas=>`shareweb.batch.${metas.length}.${metas.reduce((a,m)=>a+m.size,0)}.${(metas[0]&&metas[0].sha256||'').slice(0,32)}`;
+async function uploadBatch(files){
+  const seq=++uploadSeq;
+  $('#progressWrap').classList.remove('hidden');$('#result').classList.add('hidden');
+  if(files.length>MAX_BATCH){setProgress(0,'upload.batchTooMany',{n:MAX_BATCH});return}
+  const total=files.reduce((a,f)=>a+f.size,0);
+  if(uploadLimit&&total>uploadLimit){setProgress(0,'upload.batchTooLarge',{size:fmtLimit(uploadLimit)});return}
+  const pct=n=>total?Math.min(100,n/total*100):100;
+  // 1) 逐个算 SHA-256 (服务器用它校验分块, 并在整批续传时认领已收到的数据)
+  const metas=[];let hashed=0;
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    setProgress(pct(hashed),'upload.batchHash',{i:i+1,n:files.length,p:0});
+    let sha;
+    try{
+      sha=await sha256File(f,done=>{
+        if(seq!==uploadSeq)throw new Error('cancelled');
+        if(f.size)setProgress(pct(hashed+done),'upload.batchHash',{i:i+1,n:files.length,p:Math.floor(done/f.size*100)});
+      });
+    }catch(e){if(seq!==uploadSeq)return;setProgress(0,f.size?'upload.batchHashFailed':'upload.hashFailed');return}
+    hashed+=f.size;
+    metas.push({file:f,sha256:sha,size:f.size,filename:f.name||('file'+(i+1)),content_type:f.type||null});
+  }
+  if(seq!==uploadSeq)return;
+  // 2) 建立 (或找回) 批次会话
+  const key=batchKey(metas);
+  let r=await postJSON('/api/batch/init',{files:metas.map(m=>({sha256:m.sha256,size:m.size,filename:m.filename,content_type:m.content_type})),batch_id:lsGet(key)||undefined});
+  if(seq!==uploadSeq)return;
+  if(r.status!==200){uploadFailed(r.status,r.data.detail);return}
+  const batchId=r.data.batch_id;lsSet(key,batchId);
+  // 3) 逐个文件传分块; 服务器收齐后只暂存, 不建分享
+  let uploaded=0;
+  for(let i=0;i<metas.length;i++){
+    const m=metas[i],info=r.data.files[i];
+    if(!info){uploadFailed(500,'bad batch response');return}
+    m.id=info.upload_id;
+    let offset=info.offset;
+    if(info.done){uploaded+=m.size;continue}
+    let retries=0;
+    for(;;){
+      if(seq!==uploadSeq)return;
+      let res;
+      try{
+        res=await putChunk(m.id,offset,m.file.slice(offset,offset+CHUNK),n=>{
+          if(seq===uploadSeq)setProgress(pct(uploaded+offset+n),'upload.batchUpload',{i:i+1,n:metas.length,name:m.filename,p:m.size?Math.floor((offset+n)/m.size*100):100});
+        });
+      }catch(e){
+        if(++retries>MAX_RETRY){setProgress(pct(uploaded+offset),'upload.batchInterrupted',{p:Math.floor(pct(uploaded+offset))});return}
+        const s=Math.min(2**retries,30);setProgress(pct(uploaded+offset),'upload.retrying',{s,p:Math.floor(pct(uploaded+offset))});await sleep(s*1000);continue;
+      }
+      if(res.status===200){
+        if(res.data.done){uploaded+=m.size;break}
+        offset=res.data.offset;continue;
+      }
+      if(res.status===409){offset=res.data.offset;continue}
+      if(res.status===404){lsSet(key,null);setProgress(pct(uploaded),'upload.batchInterrupted',{p:Math.floor(pct(uploaded))});return}
+      lsSet(key,null);uploadFailed(res.status,r.data.detail);return;
+    }
+  }
+  // 4) 全部收齐, 服务器打包成一个 zip 分享
+  setProgress(99,'upload.batchPacking',{n:metas.length});
+  r=await postJSON(`/api/batch/${batchId}/complete`,{});
+  if(seq!==uploadSeq)return;
+  if(r.status!==200){uploadFailed(r.status,r.data.detail);return}
+  lsSet(key,null);setProgress(100,'upload.batchPacking',{n:metas.length});
+  const data=r.data;data.type='file';await showResult(data);
+}
 
 // ---- 断点续传 ----
 // 先用 SHA-256 和大小向服务器建立 (或找回) 上传会话, 再按 8 MB 一块从前往后传。网络断开时自动重试,
@@ -181,7 +270,7 @@ setMode((()=>{try{return localStorage.getItem('shareweb.mode')}catch(e){return n
 requestAnimationFrame(()=>requestAnimationFrame(()=>$('#mainCard').classList.remove('mode-init')));
 // 在下载页拖文件进来: 切回上传, 让文件能放到上传区
 document.addEventListener('dragenter',e=>{if([...(e.dataTransfer?.types||[])].includes('Files'))setMode('upload')});
-pick.onclick=()=>input.click();input.onchange=()=>{upload(input.files[0]);input.value=''};drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');upload(e.dataTransfer.files[0])};document.addEventListener('paste',onPaste);textBtn.onclick=async()=>{const text=paste.value;if(!text.trim())return;const res=await fetch('/api/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const data=await res.json();if(!res.ok){alert(data.detail||t('text.failed'));return}data.type='text';await showResult(data);paste.value=''};// 清除按钮两步确认: 第一次点击变成高亮的「确认」, 再点才执行; 点击其他地方 / Esc / 焦点移走 / 3 秒无操作即取消 (鼠标停在按钮上时暂停计时)。
+pick.onclick=()=>input.click();input.onchange=()=>{const fs=[...input.files];input.value='';uploadAll(fs)};drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');uploadAll([...e.dataTransfer.files])};document.addEventListener('paste',onPaste);textBtn.onclick=async()=>{const text=paste.value;if(!text.trim())return;const res=await fetch('/api/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const data=await res.json();if(!res.ok){alert(data.detail||t('text.failed'));return}data.type='text';await showResult(data);paste.value=''};// 清除按钮两步确认: 第一次点击变成高亮的「确认」, 再点才执行; 点击其他地方 / Esc / 焦点移走 / 3 秒无操作即取消 (鼠标停在按钮上时暂停计时)。
 let armedBtn=null,armTimer=0;const ARM_TIMEOUT=3000;
 // 只有真正有鼠标悬停的设备才在悬停时暂停计时 (触屏点按后 :hover 会一直粘着)
 const canHover=matchMedia('(hover: hover) and (pointer: fine)').matches;
