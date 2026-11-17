@@ -110,6 +110,8 @@ const MAX_BATCH=50;  // 与后端 app/batches.py 的 MAX_FILES 保持一致
 const postJSON=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>({status:r.status,data:await r.json().catch(()=>({}))}));
 // 整批续传的 key: 用文件个数、总大小和第一个文件的哈希识别「同一批文件」
 const batchKey=metas=>`shareweb.batch.${metas.length}.${metas.reduce((a,m)=>a+m.size,0)}.${(metas[0]&&metas[0].sha256||'').slice(0,32)}`;
+// zip 文件名里的「等 N 个文件」按当前界面语言生成 (文件名会入库并用于下载, 不在渲染时翻译)
+const zipLang=()=>(document.documentElement.lang||'en').toLowerCase().startsWith('zh')?'zh':'en';
 async function uploadBatch(files){
   const seq=++uploadSeq;
   $('#progressWrap').classList.remove('hidden');$('#result').classList.add('hidden');
@@ -170,7 +172,7 @@ async function uploadBatch(files){
   }
   // 4) 全部收齐, 服务器打包成一个 zip 分享
   setProgress(99,'upload.batchPacking',{n:metas.length});
-  r=await postJSON(`/api/batch/${batchId}/complete`,{});
+  r=await postJSON(`/api/batch/${batchId}/complete?lang=${zipLang()}`,{});
   if(seq!==uploadSeq)return;
   if(r.status!==200){uploadFailed(r.status,r.data.detail);return}
   lsSet(key,null);setProgress(100,'upload.batchPacking',{n:metas.length});

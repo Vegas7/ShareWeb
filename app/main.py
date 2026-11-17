@@ -262,8 +262,11 @@ async def batch_init(request: Request, payload: BatchInitRequest):
     return await run_in_threadpool(batches.init_batch, files, ip, None, payload.batch_id)
 
 @app.post("/api/batch/{batch_id}/complete")
-async def batch_complete(batch_id: str, request: Request, background: BackgroundTasks):
-    """多文件上传最后一步: 把暂存的文件打包成一个 zip, 建成一个普通文件分享。"""
+async def batch_complete(batch_id: str, request: Request, background: BackgroundTasks, lang: str = "zh"):
+    """多文件上传最后一步: 把暂存的文件打包成一个 zip, 建成一个普通文件分享。
+
+    lang=en / zh 决定 zip 文件名里的数量后缀 (文件名会存进数据库并用于下载, 所以按创建时的界面语言生成)。
+    """
     ip = ensure_not_blacklisted(request)
     if len(batch_id) != 32 or any(c not in "0123456789abcdef" for c in batch_id):
         raise HTTPException(404, "batch not found")
@@ -271,7 +274,7 @@ async def batch_complete(batch_id: str, request: Request, background: Background
     if not count:
         raise HTTPException(404, "batch not found")
     await _ensure_space(need, ip)  # 打包时磁盘上会同时存在暂存文件和 zip
-    staged = await run_in_threadpool(batches.build_zip, batch_id)
+    staged = await run_in_threadpool(batches.build_zip, batch_id, lang if lang in ("zh", "en") else "zh")
     try:
         payload = _create_file_share(request, background, staged["filename"], "application/zip",
                                      staged["size"], staged["sha256"], staged["stored_name"],

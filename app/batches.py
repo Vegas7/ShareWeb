@@ -121,13 +121,19 @@ def _arcname(name: str | None, used: set[str]) -> str:
     return candidate
 
 
-def _zip_name(rows) -> str:
-    """分享显示的名字: 首个文件名 + 个数, 例如「报告 等 3 个文件.zip」。"""
+def _zip_name(rows, lang: str = "zh") -> str:
+    """分享显示的名字: 首个文件名 + 个数, 例如「报告 等 3 个文件.zip」/「report (3 files).zip」。
+
+    文件名会原样存进数据库并用于下载, 所以按创建时界面语言生成 (en / zh), 不在渲染时翻译。
+    """
     n = len(rows)
     first = (rows[0]["filename"] or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
     stem = os.path.splitext(first)[0].strip() if first else ""
     stem = stem.translate(_BAD_CHARS).strip().rstrip(". ")[:80]
-    return f"{stem} 等 {n} 个文件.zip" if stem else f"{n} 个文件.zip"
+    zh = lang != "en"
+    if stem:
+        return f"{stem} 等 {n} 个文件.zip" if zh else f"{stem} ({n} files).zip"
+    return f"{n} 个文件.zip" if zh else f"{n} files.zip"
 
 
 def _file_sha256(path) -> str:
@@ -138,7 +144,7 @@ def _file_sha256(path) -> str:
     return sha.hexdigest()
 
 
-def build_zip(batch_id: str) -> dict:
+def build_zip(batch_id: str, lang: str = "zh") -> dict:
     """把批次里暂存的文件打包成 zip (存到 data 目录), 返回新文件的信息。失败时不留临时文件。"""
     with connect() as conn:
         if not conn.execute("SELECT 1 FROM batches WHERE id=?", (batch_id,)).fetchone():
@@ -184,7 +190,7 @@ def build_zip(batch_id: str) -> dict:
             "rel_path": str(final.relative_to(settings.data_dir)),
             "size": final.stat().st_size,
             "sha256": sha,
-            "filename": _zip_name(rows),
+            "filename": _zip_name(rows, lang),
             "count": len(items),
             "bytes": total}
 
