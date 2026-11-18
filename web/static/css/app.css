@@ -570,3 +570,54 @@ html.admin-page{scrollbar-gutter:stable}
   .redeem-hint{margin-top:8px}
 }
 .home main > p.center{margin:10px 0 0}
+
+/* ---- 多文件分享: 图库 + 文件列表 + 大图浏览 (share.js) ---- */
+.bundle-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:16px 0 8px}
+.link-btn{border:0;background:none;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--accent);cursor:pointer}
+.link-btn:hover{text-decoration:underline}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.g-tile{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--card-border);background:color-mix(in srgb,var(--muted) 10%,var(--card))}
+.g-open{display:block;width:100%;aspect-ratio:1;padding:0;border:0;background:none;cursor:zoom-in}
+.g-open img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .25s ease}
+.g-open:hover img{transform:scale(1.04)}
+.g-open:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.g-ph{display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:34px;opacity:.55}
+.g-name{position:absolute;left:0;right:0;bottom:0;padding:18px 40px 6px 8px;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(transparent,rgba(0,0,0,.6));pointer-events:none;opacity:0;transition:opacity .15s ease}
+.g-dl{position:absolute;right:6px;bottom:6px;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.5);opacity:0;transition:opacity .15s ease}
+.g-dl:hover{background:var(--accent)}
+.g-tile:hover .g-name,.g-tile:hover .g-dl,.g-tile:focus-within .g-dl{opacity:1}
+@media (hover:none){.g-dl{opacity:.9}}
+@media(max-width:480px){.gallery{grid-template-columns:repeat(3,1fr);gap:6px}.g-tile{border-radius:8px}}
+.bundle-list{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--card-border);border-radius:12px;overflow:hidden}
+.bundle-list li{display:flex;align-items:center;gap:10px;padding:9px 10px 9px 12px;border-top:1px solid var(--card-border);min-width:0}
+.bundle-list li:first-child{border-top:0}
+.bl-icon{flex:none}
+.bl-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-size{flex:none}
+.bl-dl{flex:none;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.bl-dl:hover{background:var(--accent-soft)}
+html.lb-open{overflow:hidden}
+.lightbox{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;background:#0b0d13;color:#fff;touch-action:pan-y pinch-zoom}
+.lb-top{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;font-size:14px}
+.lb-count{flex:none;opacity:.75;font-variant-numeric:tabular-nums}
+.lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-btn{border:0;background:rgba(255,255,255,.1);color:#fff;font:inherit;cursor:pointer;border-radius:999px;display:flex;align-items:center;justify-content:center;transition:background .15s ease}
+.lb-btn:hover{background:rgba(255,255,255,.22)}
+.lb-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.lb-close{flex:none;width:38px;height:38px;font-size:16px}
+.lb-stage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;padding:0 64px}
+.lb-img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none}
+.lb-img.broken{visibility:hidden}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;font-size:30px;line-height:1;padding-bottom:4px}
+.lb-prev{left:10px}.lb-next{right:10px}
+.lightbox.single .lb-nav,.lightbox.single .lb-count{display:none}
+.lb-bottom{padding:12px 16px 18px;text-align:center}
+.lb-actions{display:flex;gap:10px;justify-content:center}
+.lb-actions .primary{min-width:120px}
+.lb-msg{margin-top:8px;color:rgba(255,255,255,.7)}
+@media(max-width:600px){
+  .lb-stage{padding:0}
+  .lb-nav{display:none}
+  .lb-actions .primary{flex:1}
+  .lb-bottom{padding-bottom:max(18px,env(safe-area-inset-bottom))}
+}

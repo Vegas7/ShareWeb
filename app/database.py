@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS shares (
     github_sha TEXT,
     -- 管理员锁定: 锁定的文件不过期, 也不会被手动/自动清理删除, 直到解锁
     locked INTEGER NOT NULL DEFAULT 0,
-    api_key_id INTEGER
+    api_key_id INTEGER,
+    -- 多文件分享 (zip) 的文件清单 JSON, 见 bundles.py; 普通分享为 NULL
+    bundle TEXT
 );
 CREATE TABLE IF NOT EXISTS access_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,6 +137,8 @@ _ADDED_COLUMNS = {
         "locked": "INTEGER NOT NULL DEFAULT 0",
         # 通过外部 API 创建时记下是哪个密钥 (网页上传为 NULL); 该密钥可列出 / 删除自己创建的分享
         "api_key_id": "INTEGER",
+        # 多文件分享的文件清单 (见 bundles.py)
+        "bundle": "TEXT",
     },
     "uploads": {
         "api_key_id": "INTEGER",

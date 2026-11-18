@@ -50,6 +50,21 @@ I18N.add({
     'gh.unavailable': 'Unavailable, please try again later',
     'gh.done': 'Link ready ✓',
     'gh.failed': 'Failed: {msg}',
+    'bundle.galleryTitle': 'Gallery · {n} images ✓',
+    'bundle.filesTitle': '{n} files ✓',
+    'bundle.images': 'Images · {n}',
+    'bundle.files': 'Other files · {n}',
+    'bundle.downloadAll': '⬇️ Download all (.zip)',
+    'bundle.copyLinks': 'Copy all image links',
+    'bundle.copiedLinks': 'Links copied ✓',
+    'bundle.copy': '📋 Copy',
+    'bundle.copied': 'Copied ✓',
+    'bundle.download': '⬇️ Download',
+    'bundle.downloadOne': 'Download',
+    'bundle.prev': 'Previous',
+    'bundle.next': 'Next',
+    'bundle.close': 'Close',
+    'bundle.noPreview': 'No preview',
   },
   zh: {
     'share.pageTitle': '共享内容 · ShareWeb',
@@ -102,6 +117,21 @@ I18N.add({
     'gh.unavailable': '暂不可用，请稍后重试',
     'gh.done': '已获取 ✓',
     'gh.failed': '获取失败：{msg}',
+    'bundle.galleryTitle': '图库 · {n} 张图片 ✓',
+    'bundle.filesTitle': '{n} 个文件 ✓',
+    'bundle.images': '图片 · {n}',
+    'bundle.files': '其他文件 · {n}',
+    'bundle.downloadAll': '⬇️ 全部下载（.zip）',
+    'bundle.copyLinks': '复制全部图片链接',
+    'bundle.copiedLinks': '已复制链接 ✓',
+    'bundle.copy': '📋 复制',
+    'bundle.copied': '已复制 ✓',
+    'bundle.download': '⬇️ 下载',
+    'bundle.downloadOne': '下载',
+    'bundle.prev': '上一张',
+    'bundle.next': '下一张',
+    'bundle.close': '关闭',
+    'bundle.noPreview': '无法预览',
   },
 });
 const t = I18N.t, S = I18N.span, H = I18N.htmlSpan, setKey = I18N.setKey;
@@ -292,24 +322,33 @@ function renderImage(d, filename, exp) {
   bindGithub(d, filename);
   document.querySelector('#copyImgBtn').onclick = async e => {
     const btn = e.currentTarget;
-    try {
-      const blob = await (await fetch(`${url}?inline=1`)).blob();
-      let out = blob;
-      // clipboard 对 PNG 支持最好；非 PNG 尝试转 PNG
-      if (blob.type !== 'image/png' && window.createImageBitmap && document.createElement('canvas').getContext) {
-        try {
-          const bmp = await createImageBitmap(blob);
-          const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
-          c.getContext('2d').drawImage(bmp, 0, 0);
-          out = await new Promise(res => c.toBlob(res, 'image/png'));
-        } catch (e) {}
-      }
-      await navigator.clipboard.write([new ClipboardItem({ [out.type]: out })]);
-      flash(btn, 'share.copiedImage', 'share.copyImage');
-    } catch (e) {
-      setKey(document.querySelector('#imgMsg'), 'share.noImageClipboard');
-    }
+    if (await copyImage(`${url}?inline=1`)) flash(btn, 'share.copiedImage', 'share.copyImage');
+    else setKey(document.querySelector('#imgMsg'), 'share.noImageClipboard');
   };
+}
+
+// 取图片并转成 PNG (剪贴板对 PNG 支持最好)
+async function imagePng(url) {
+  const blob = await (await fetch(url)).blob();
+  if (blob.type === 'image/png') return blob;
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('toBlob')), 'image/png'));
+}
+// 复制图片到剪贴板, 返回是否成功。先把 Promise 交给 ClipboardItem (Safari 要求在点击当下就调用 write),
+// 不支持 Promise 的浏览器再等图片取回后写入。
+async function copyImage(url) {
+  if (!window.ClipboardItem || !navigator.clipboard?.write) return false;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': imagePng(url) })]);
+    return true;
+  } catch (e) {}
+  try {
+    const png = await imagePng(url);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    return true;
+  } catch (e) { return false; }
 }
 
 function renderFile(d, filename, exp) {
@@ -320,18 +359,24 @@ function renderFile(d, filename, exp) {
   const ext = (filename.split('.').pop() || '').toLowerCase();
   const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'webm', 'ogv'];
   const AUDIO_EXT = ['mp3', 'wav', 'aac', 'flac', 'oga', 'm4a', 'ogg'];
-  const isVideo = mime.startsWith('video/') || VIDEO_EXT.includes(ext);
-  const isAudio = !isVideo && (mime.startsWith('audio/') || AUDIO_EXT.includes(ext));
+  const bundle = Array.isArray(d.bundle) ? d.bundle : null;
+  const isVideo = !bundle && (mime.startsWith('video/') || VIDEO_EXT.includes(ext));
+  const isAudio = !bundle && !isVideo && (mime.startsWith('audio/') || AUDIO_EXT.includes(ext));
   // 不用 <source type=...> 过滤：直接给 src，让浏览器按实际内容尝试解码
   // (否则 .mov=video/quicktime 等会被 Chrome 依据 type 字符串直接判为不支持而根本不尝试)。
   const playerHtml = isVideo
     ? `<video id="mediaEl" controls preload="metadata" playsinline style="width:100%;max-height:70vh;border-radius:12px;background:#000;margin:8px 0"></video><div id="mediaFallback" class="note hidden"></div>`
     : isAudio
     ? `<audio id="mediaEl" controls preload="metadata" style="width:100%;margin:8px 0"></audio><div id="mediaFallback" class="note hidden"></div>`
-    : '';
+    : bundle ? bundleHtml(bundle) : '';
+  const nImages = bundle ? bundle.filter(e => e.view).length : 0;
+  const title = bundle
+    ? (nImages === bundle.length ? S('bundle.galleryTitle', { n: nImages }) : S('bundle.filesTitle', { n: bundle.length }))
+    : S(isVideo ? 'share.videoTitle' : isAudio ? 'share.audioTitle' : 'share.fileTitle');
+  const dlKey = bundle ? 'bundle.downloadAll' : 'share.download';
   box.innerHTML = `
     <div class="result-box" style="margin-top:0;">
-      <h2 class="result-title">${S(isVideo ? 'share.videoTitle' : isAudio ? 'share.audioTitle' : 'share.fileTitle')}</h2>
+      <h2 class="result-title">${title}</h2>
       <p>
         <strong style="font-size:18px;word-break:break-all;">${esc(filename)}</strong><br>
         <span class="meta">${S('share.fileMeta', { size: fmtSize(d.size), d: exp, n: d.download_count ?? 0 })}</span>
@@ -339,7 +384,7 @@ function renderFile(d, filename, exp) {
       ${codeBlock(d)}
       ${playerHtml}
       ${shaBlock(d.sha256)}
-      <a class="primary accent wide button" id="dlBtn" href="${downloadUrl}" download="${esc(filename)}" data-i18n="share.download">${esc(t('share.download'))}</a>
+      <a class="primary accent wide button" id="dlBtn" href="${downloadUrl}" download="${esc(filename)}" data-i18n="${dlKey}">${esc(t(dlKey))}</a>
 
       <div class="enc-box">
         <div class="enc-head">
@@ -375,6 +420,7 @@ function renderFile(d, filename, exp) {
     </div>`;
 
   bindCodeAndSha(d);
+  if (bundle) bindBundle(bundle);
 
   const mediaEl = document.querySelector('#mediaEl');
   if (mediaEl) {
@@ -435,4 +481,169 @@ function renderEncText(wrap, b64) {
       b.onclick = async () => { await copy(parts[Number(b.dataset.i)]); flash(b, 'common.copied', 'enc.copyPart'); };
     });
   }
+}
+
+// ---------------------------------------------------------------- 多文件分享: 图库 + 文件列表
+// 每个文件都可以单独取: /download/<token>/item/<i> (inline 显示; ?dl=1 下载),
+// 图片另有 /thumb 缩略图, HEIC/TIFF 等浏览器不能直接显示的有 /preview 预览图。
+const DL_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>';
+const itemUrl = i => `/download/${encodeURIComponent(token)}/item/${i}`;
+const thumbUrl = (e, i) => e.thumb ? itemUrl(i) + '/thumb' : e.view === 'orig' ? itemUrl(i) : '';
+const viewUrl = (e, i) => e.view === 'preview' ? itemUrl(i) + '/preview' : itemUrl(i);
+const dlUrl = i => itemUrl(i) + '?dl=1';
+const FILE_ICONS = [[/^video\//, '🎬'], [/^audio\//, '🎵'], [/^text\/|json|xml/, '📝'], [/pdf/, '📕'],
+  [/zip|rar|7z|tar|gzip|compressed/, '🗜️'], [/sheet|excel|csv/, '📊'], [/presentation|powerpoint/, '📽️'], [/word|document/, '📄']];
+const fileIcon = mime => (FILE_ICONS.find(([re]) => re.test(mime || '')) || [0, '📄'])[1];
+
+function bundleHtml(bundle) {
+  const images = [], files = [];
+  bundle.forEach((e, i) => (e.view ? images : files).push([e, i]));
+  let html = '';
+  if (images.length) {
+    const tiles = images.map(([e, i], k) => {
+      const src = thumbUrl(e, i);
+      return `<div class="g-tile" data-k="${k}">
+        <button type="button" class="g-open" data-k="${k}" aria-label="${esc(e.name)}">${src
+          ? `<img src="${esc(src)}" alt="${esc(e.name)}" loading="lazy" decoding="async" data-i="${i}">`
+          : `<span class="g-ph">🖼️</span>`}</button>
+        <span class="g-name">${esc(e.name)}</span>
+        <a class="g-dl" href="${dlUrl(i)}" download="${esc(e.name)}" data-i18n-title="bundle.downloadOne" title="${esc(t('bundle.downloadOne'))}">${DL_ICON}</a>
+      </div>`;
+    }).join('');
+    html += `
+      <div class="bundle-head">
+        <span class="copy-label">${S('bundle.images', { n: images.length })}</span>
+        <button type="button" class="link-btn" id="copyLinksBtn" data-i18n="bundle.copyLinks">${esc(t('bundle.copyLinks'))}</button>
+      </div>
+      <div class="gallery" id="gallery">${tiles}</div>`;
+  }
+  if (files.length) {
+    const rows = files.map(([e, i]) => `<li>
+        <span class="bl-icon" aria-hidden="true">${fileIcon(e.mime)}</span>
+        <span class="bl-name">${esc(e.name)}</span>
+        <span class="bl-size meta">${esc(fmtSize(e.size))}</span>
+        <a class="bl-dl" href="${dlUrl(i)}" download="${esc(e.name)}" data-i18n-title="bundle.downloadOne" title="${esc(t('bundle.downloadOne'))}">${DL_ICON}</a>
+      </li>`).join('');
+    html += `
+      ${images.length ? `<div class="bundle-head"><span class="copy-label">${S('bundle.files', { n: files.length })}</span></div>` : ''}
+      <ul class="bundle-list">${rows}</ul>`;
+  }
+  return html;
+}
+
+function bindBundle(bundle) {
+  const images = bundle.map((e, i) => ({ ...e, i })).filter(e => e.view);
+  const gallery = document.querySelector('#gallery');
+  if (!gallery) return;
+  // 缩略图生成失败 (格式不支持 / 图片太大) 时先退回原图, 再不行显示占位图标
+  gallery.querySelectorAll('img[data-i]').forEach(img => {
+    img.addEventListener('error', () => {
+      const e = bundle[Number(img.dataset.i)];
+      const orig = itemUrl(img.dataset.i);
+      if (e.view === 'orig' && !img.src.endsWith(orig)) { img.src = orig; return; }
+      img.replaceWith(Object.assign(document.createElement('span'), { className: 'g-ph', textContent: '🖼️' }));
+    });
+  });
+  gallery.querySelectorAll('.g-open').forEach(b => { b.onclick = () => openLightbox(images, Number(b.dataset.k)); });
+  const linksBtn = document.querySelector('#copyLinksBtn');
+  linksBtn.onclick = async () => {
+    await copy(images.map(e => location.origin + itemUrl(e.i)).join('\n'));
+    flash(linksBtn, 'bundle.copiedLinks', 'bundle.copyLinks');
+  };
+}
+
+// 大图浏览: ← → 切换, Esc 关闭, 手机上左右滑动切换
+let lb = null;
+function openLightbox(images, start) {
+  if (!lb) lb = buildLightbox();
+  lb.images = images;
+  lb.root.classList.remove('hidden');
+  document.documentElement.classList.add('lb-open');
+  lb.prevFocus = document.activeElement;
+  showSlide(start);
+  lb.closeBtn.focus({ preventScroll: true });
+}
+function closeLightbox() {
+  if (!lb || lb.root.classList.contains('hidden')) return;
+  lb.root.classList.add('hidden');
+  document.documentElement.classList.remove('lb-open');
+  lb.img.removeAttribute('src');
+  if (lb.prevFocus && lb.prevFocus.focus) lb.prevFocus.focus({ preventScroll: true });
+}
+function showSlide(k) {
+  const n = lb.images.length;
+  k = (k + n) % n;
+  lb.k = k;
+  const e = lb.images[k];
+  const full = viewUrl(e, e.i), thumb = thumbUrl(e, e.i);
+  lb.count.textContent = `${k + 1} / ${n}`;
+  lb.name.textContent = e.name;
+  lb.dl.href = dlUrl(e.i); lb.dl.setAttribute('download', e.name);
+  lb.root.classList.toggle('single', n === 1);
+  setKey(lb.msg, null);
+  // 先显示已经加载过的缩略图, 原图到了再换上
+  lb.img.classList.remove('broken');
+  lb.img.alt = e.name;
+  lb.img.src = thumb || full;
+  if (thumb && thumb !== full) {
+    const pre = new Image();
+    pre.onload = () => { if (lb.k === k) lb.img.src = full; };
+    pre.src = full;
+  }
+  // 预取前后两张
+  [k - 1, k + 1].forEach(j => { const x = lb.images[(j + n) % n]; if (x) new Image().src = viewUrl(x, x.i); });
+}
+function buildLightbox() {
+  const root = document.createElement('div');
+  root.className = 'lightbox hidden';
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-modal', 'true');
+  root.innerHTML = `
+    <div class="lb-top">
+      <span class="lb-count"></span>
+      <span class="lb-name"></span>
+      <button type="button" class="lb-btn lb-close" data-i18n-title="bundle.close" title="${esc(t('bundle.close'))}" aria-label="${esc(t('bundle.close'))}">✕</button>
+    </div>
+    <div class="lb-stage">
+      <button type="button" class="lb-btn lb-nav lb-prev" data-i18n-title="bundle.prev" title="${esc(t('bundle.prev'))}" aria-label="${esc(t('bundle.prev'))}">‹</button>
+      <img class="lb-img" alt="">
+      <button type="button" class="lb-btn lb-nav lb-next" data-i18n-title="bundle.next" title="${esc(t('bundle.next'))}" aria-label="${esc(t('bundle.next'))}">›</button>
+    </div>
+    <div class="lb-bottom">
+      <div class="lb-actions">
+        <button type="button" class="primary" id="lbCopy" data-i18n="bundle.copy">${esc(t('bundle.copy'))}</button>
+        <a class="primary accent button" id="lbDl" data-i18n="bundle.download">${esc(t('bundle.download'))}</a>
+      </div>
+      <div class="lb-msg meta"></div>
+    </div>`;
+  document.body.appendChild(root);
+  const q = sel => root.querySelector(sel);
+  const o = { root, img: q('.lb-img'), count: q('.lb-count'), name: q('.lb-name'), dl: q('#lbDl'), msg: q('.lb-msg'), closeBtn: q('.lb-close'), k: 0, images: [] };
+  o.img.addEventListener('error', () => o.img.classList.add('broken'));
+  o.img.addEventListener('load', () => o.img.classList.remove('broken'));
+  q('.lb-close').onclick = closeLightbox;
+  q('.lb-prev').onclick = () => showSlide(o.k - 1);
+  q('.lb-next').onclick = () => showSlide(o.k + 1);
+  // 点图片以外的空白处关闭
+  q('.lb-stage').addEventListener('click', e => { if (e.target === e.currentTarget) closeLightbox(); });
+  q('#lbCopy').onclick = async e => {
+    const btn = e.currentTarget, x = o.images[o.k];
+    if (await copyImage(viewUrl(x, x.i))) flash(btn, 'bundle.copied', 'bundle.copy');
+    else setKey(o.msg, 'share.noImageClipboard');
+  };
+  document.addEventListener('keydown', e => {
+    if (root.classList.contains('hidden')) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeLightbox(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); showSlide(o.k - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); showSlide(o.k + 1); }
+  });
+  let x0 = null, y0 = null;
+  root.addEventListener('touchstart', e => { if (e.touches.length === 1) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } }, { passive: true });
+  root.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showSlide(o.k + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+  return o;
 }

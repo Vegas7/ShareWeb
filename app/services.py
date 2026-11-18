@@ -5,6 +5,7 @@ from .config import settings
 from .database import connect
 from .security import utcnow, iso, random_token, random_code, is_blacklisted, check_cooldown, clear_failed_attempts, record_failed_attempt
 from .storage import safe_delete
+from . import bundles
 from .crypto import new_key_b64
 from . import github_mirror
 
@@ -59,6 +60,11 @@ def create_share_file(original_name, mime_type, size, sha256, storage_name, stor
     share_id, token, code, exp = _create_share("file", original_name, mime_type, size, sha256, storage_name, storage_path, api_key_id)
     log_event(ip, "UPLOAD", "SUCCESS", share_id, f"FILE={original_name} SIZE={size} SHA256={sha256} CODE={code}{_via(api_key_id)}", user_agent)
     return share_id, token, code, exp
+
+def set_bundle(share_id, entries_json):
+    """记下多文件分享 (zip) 的文件清单, 分享页据此显示图库 / 文件列表。"""
+    with connect() as conn:
+        conn.execute("UPDATE shares SET bundle=? WHERE id=?", (entries_json, share_id))
 
 def create_share_text(storage_name, storage_path, size, sha256, ip, user_agent, api_key_id=None):
     share_id, token, code, exp = _create_share("text", "text.txt", "text/plain; charset=utf-8", size, sha256, storage_name, storage_path, api_key_id)
@@ -117,6 +123,7 @@ def get_active_file_by_sha256(sha256):
 def _remove_stored(row):
     """删除分享的本地文件和 GitHub 镜像 (row 需含 storage_path/github_path/github_sha)。"""
     safe_delete(row["storage_path"])
+    bundles.drop_cache(row["storage_path"])
     _github_cleanup(row)
 
 

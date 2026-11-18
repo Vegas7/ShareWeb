@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
@@ -24,14 +25,14 @@ from .security import (utcnow, iso, require_admin_session, admin_locked_until, r
                        clear_admin_failures)
 from .services import (SPECIAL_CODE, RedeemBlocked, cleanup_expired, cleanup_old_files, create_share_file, create_share_text,
                        delete_files, evict_for_space, evictable_files, get_active_file_by_sha256, get_github_download_url,
-                       get_share_by_token, list_files, log_event, mirror_to_github, redeem_code, set_files_locked, share_status,
-                       touch_download)
+                       get_share_by_token, list_files, log_event, mirror_to_github, redeem_code, set_bundle, set_files_locked,
+                       share_status, touch_download)
 from .storage import save_upload_stream, save_text, cleanup_stale_uploads, UploadTooLarge, BadUpload, DiskFull, safe_delete
 from . import crypto
 from . import github_mirror
 from . import geoip, visitors
 from . import app_settings
-from . import batches, resumable
+from . import batches, bundles, resumable
 from . import api_v1, apikeys, llm_doc
 from .shareops import (share_payload as _share_payload, ensure_space as _ensure_space, disk_full_handler as _disk_full_handler,
                        create_file_share as _create_file_share, resolve_share_path as _resolve_share_path)
@@ -279,11 +280,15 @@ async def batch_complete(batch_id: str, request: Request, background: Background
         payload = _create_file_share(request, background, staged["filename"], "application/zip",
                                      staged["size"], staged["sha256"], staged["stored_name"],
                                      staged["rel_path"], ip)
+        await run_in_threadpool(set_bundle, payload["id"], bundles.dumps(staged["entries"]))
     except BaseException:
         safe_delete(staged["rel_path"])
         raise
     finally:
         await run_in_threadpool(batches.finish, batch_id)
+    # 后台先把图片缩略图生成好, 收件人打开分享页时图库就能直接显示
+    if any(e["view"] for e in staged["entries"]):
+        background.add_task(_warm_thumbnails, payload["token"])
     log_event(ip, "UPLOAD_BATCH", "SUCCESS", payload["id"],
               f"FILES={staged['count']} SIZE={staged['size']} SHA256={staged['sha256']} CODE={payload['code']}",
               request.headers.get("user-agent", "-"))
@@ -346,7 +351,8 @@ async def share_meta(token: str, request: Request):
     # 密钥对持有分享链接的人可见 (加密下载的授权对象即链接持有者)。
     enc_key = row["enc_key"] if row["type"] == "file" else None
     github_available = github_mirror.enabled() and row["type"] == "file" and github_mirror.fits(row["size"] or 0)
-    return {"token": row["token"], "code": row["code"], "url": f"{settings.public_base_url}/share/{row['token']}", "type": row["type"], "filename": row["original_name"], "size": row["size"], "sha256": row["sha256"], "mime_type": row["mime_type"], "text": text, "created_at": row["created_at"], "expires_at": None if row["locked"] else row["expires_at"], "download_count": row["download_count"], "enc_key": enc_key, "github": github_available}
+    bundle = bundles.public_entries(row) if row["type"] == "file" else None
+    return {"bundle": bundle, "token": row["token"], "code": row["code"], "url": f"{settings.public_base_url}/share/{row['token']}", "type": row["type"], "filename": row["original_name"], "size": row["size"], "sha256": row["sha256"], "mime_type": row["mime_type"], "text": text, "created_at": row["created_at"], "expires_at": None if row["locked"] else row["expires_at"], "download_count": row["download_count"], "enc_key": enc_key, "github": github_available}
 
 
 @app.get("/api/share/{token}/github")
@@ -388,6 +394,76 @@ async def redeem(request: Request, payload: RedeemRequest):
         return JSONResponse({"ok": False, "error": "invalid_code", "fail_count": fail_count}, status_code=404)
     return {"ok": True, "token": row["token"], "url": f"/share/{row['token']}"}
 
+# 从分享里直接显示上传的内容时附带: 禁止脚本 / 外部资源, 只当静态内容看
+_UPLOAD_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; media-src 'self'; sandbox"
+# 同一时间只生成一张缩略图 (服务器内存小); 排队在事件循环里等, 不占线程池
+_thumb_sem = asyncio.Semaphore(1)
+
+
+def _warm_thumbnails(token: str):
+    row = get_share_by_token(token)
+    if row and bundles.entries(row):
+        try:
+            bundles.warm(_resolve_share_path(row), row)
+        except HTTPException:
+            pass
+
+
+def _bundle_row(token: str, request: Request):
+    """多文件分享的记录和 zip 路径; 不存在 / 不是多文件分享时 404。"""
+    ip = ensure_not_blacklisted(request)
+    row = get_share_by_token(token)
+    if not row or row["type"] != "file" or not bundles.entries(row):
+        raise HTTPException(404, "file not found or expired")
+    return ip, row, _resolve_share_path(row)
+
+
+def _content_disposition(kind: str, filename: str) -> str:
+    ascii_name = filename.encode("ascii", "ignore").decode().replace('"', "").strip() or "download"
+    return f"{kind}; filename=\"{ascii_name}\"; filename*=utf-8''{quote(filename, safe='')}"
+
+
+@app.get("/download/{token}/item/{idx}")
+async def download_item(token: str, idx: int, request: Request, dl: int = 0):
+    """多文件分享里的单个文件 (从 zip 里流式读出)。默认 inline 供图库显示; dl=1 作为附件下载并计入下载次数。"""
+    ip, row, zip_path = _bundle_row(token, request)
+    try:
+        entry, info = await run_in_threadpool(bundles.entry_info, zip_path, row, idx)
+    except bundles.EntryNotFound:
+        raise HTTPException(404, "file not found")
+    name = entry["name"]
+    headers = {"Content-Length": str(info.file_size), "X-Content-Type-Options": "nosniff"}
+    if dl:
+        await run_in_threadpool(touch_download, row["id"], ip, request.headers.get("user-agent", "-"))
+        headers["Content-Disposition"] = _content_disposition("attachment", name)
+        headers["Cache-Control"] = "private, no-store"
+    else:
+        headers["Content-Disposition"] = _content_disposition("inline", name)
+        headers["Content-Security-Policy"] = _UPLOAD_CSP
+        # 分享里的文件不会变; 允许浏览器缓存, 图库来回翻看时不用重复下载
+        headers["Cache-Control"] = "private, max-age=3600"
+    return StreamingResponse(bundles.iter_entry(zip_path, info), media_type=entry.get("mime") or "application/octet-stream",
+                             headers=headers)
+
+
+@app.get("/download/{token}/item/{idx}/{kind}")
+async def download_item_image(token: str, idx: int, kind: str, request: Request):
+    """图库用的缩略图 (thumb) / 浏览器不能直接显示的格式 (HEIC/TIFF) 转换后的预览图 (preview), WebP。"""
+    if kind not in ("thumb", "preview"):
+        raise HTTPException(404, "not found")
+    _, row, zip_path = _bundle_row(token, request)
+    path = bundles.cached(row, idx, kind)
+    if not path:
+        async with _thumb_sem:
+            try:
+                path = await run_in_threadpool(bundles.generate, zip_path, row, idx, kind)
+            except bundles.EntryNotFound:
+                raise HTTPException(404, "file not found")
+            except bundles.NoThumbnail:
+                raise HTTPException(415, "no preview for this file")
+    return FileResponse(path, media_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+
+
 @app.get("/download/{token}")
 async def download(token: str, request: Request, enc: int = 0, inline: int = 0):
     """明文下载 (FastAPI 直出, 原生支持 Range/断点续传)。
@@ -413,7 +489,8 @@ async def download(token: str, request: Request, enc: int = 0, inline: int = 0):
             abs_path,
             media_type=mime,
             content_disposition_type="inline",
-            headers={"Cache-Control": "private, no-store"},
+            # sandbox: 直接打开上传的 SVG / HTML 时不执行其中的脚本 (不影响 <img>/<video> 显示)
+            headers={"Cache-Control": "private, no-store", "Content-Security-Policy": _UPLOAD_CSP},
         )
 
     if enc:

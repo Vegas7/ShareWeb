@@ -21,7 +21,7 @@ from .config import settings
 from .database import connect
 from .security import iso, utcnow
 from .storage import safe_delete, shard_dir
-from . import resumable
+from . import bundles, resumable
 
 logger = logging.getLogger(__name__)
 
@@ -170,11 +170,14 @@ def build_zip(batch_id: str, lang: str = "zh") -> dict:
     tmp = settings.data_dir / f".zip-{secrets.token_hex(8)}"
     try:
         used: set[str] = set()
+        entries = []  # zip 里的文件清单, 顺序与 zip 内一致 (分享页据此浏览, 见 bundles.py)
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
             for path, name, size, mime in items:
                 compress = zipfile.ZIP_STORED if (size > _COMPRESS_MAX or mime.startswith(_STORED_MIME)) \
                     else zipfile.ZIP_DEFLATED
-                zf.write(path, arcname=_arcname(name, used), compress_type=compress)
+                arcname = _arcname(name, used)
+                zf.write(path, arcname=arcname, compress_type=compress)
+                entries.append(bundles.describe(arcname, size, mime))
         sha = _file_sha256(tmp)
         stored_name = secrets.token_hex(16) + ".share"
         final = shard_dir(stored_name) / stored_name
@@ -192,6 +195,7 @@ def build_zip(batch_id: str, lang: str = "zh") -> dict:
             "sha256": sha,
             "filename": _zip_name(rows, lang),
             "count": len(items),
+            "entries": entries,
             "bytes": total}
 
 
