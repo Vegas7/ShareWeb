@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS shares (
     locked INTEGER NOT NULL DEFAULT 0,
     api_key_id INTEGER,
     -- 多文件分享 (zip) 的文件清单 JSON, 见 bundles.py; 普通分享为 NULL
-    bundle TEXT
+    bundle TEXT,
+    -- 多文件分享里单独镜像到 GitHub 的文件: JSON {"<序号>": [github_path, github_sha]}
+    github_items TEXT
 );
 CREATE TABLE IF NOT EXISTS access_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,6 +141,7 @@ _ADDED_COLUMNS = {
         "api_key_id": "INTEGER",
         # 多文件分享的文件清单 (见 bundles.py)
         "bundle": "TEXT",
+        "github_items": "TEXT",
     },
     "uploads": {
         "api_key_id": "INTEGER",

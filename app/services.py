@@ -1,4 +1,7 @@
+import json
 import logging
+import os
+import secrets
 import threading
 from datetime import timedelta
 from .config import settings
@@ -16,7 +19,7 @@ _FILE_WHERE = "type='file'"
 # 仍然有效的分享: 未过期, 或已被管理员锁定。参数: 当前时间
 _ALIVE_WHERE = "active=1 AND (expires_at IS NULL OR expires_at>? OR locked=1)"
 # 删除分享时需要的列
-_PURGE_COLS = "id, storage_path, size, github_path, github_sha"
+_PURGE_COLS = "id, storage_path, size, github_path, github_sha, github_items"
 
 
 def log_event(ip, action, result, share_id='-', detail='', user_agent='-', level=logging.INFO):
@@ -366,14 +369,83 @@ def get_github_download_url(share_id):
     return {"url": url, "filename": github_mirror.download_filename(row["github_path"], row["github_sha"], row["original_name"])}
 
 
+def _github_items(row) -> dict:
+    """多文件分享里已单独镜像到 GitHub 的文件 {"<序号>": [github_path, github_sha]}。"""
+    try:
+        data = json.loads(row["github_items"] or "{}")
+    except (IndexError, KeyError, ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def _github_cleanup(row):
-    """尽力从 GitHub 删除已镜像的文件。"""
-    gp, gs = row["github_path"], row["github_sha"]
-    if github_mirror.enabled() and gp and gs:
-        try:
-            github_mirror.delete(gp, gs)
-        except Exception:
-            logger.warning("github cleanup delete failed for %s", gp)
+    """尽力从 GitHub 删除已镜像的文件 (整个分享的镜像, 以及多文件分享里单独镜像的文件)。"""
+    if not github_mirror.enabled():
+        return
+    pairs = [(row["github_path"], row["github_sha"])] + [tuple(v) for v in _github_items(row).values()
+                                                         if isinstance(v, list) and len(v) == 2]
+    for gp, gs in pairs:
+        if gp and gs:
+            try:
+                github_mirror.delete(gp, gs)
+            except Exception:
+                logger.warning("github cleanup delete failed for %s", gp)
+
+
+def get_github_item_url(share_id, idx):
+    """多文件分享里第 idx 个文件的 GitHub 短时效直链 {"url", "filename"}; 第一次请求时把这个文件单独传到 GitHub。
+
+    整个 zip 的镜像 (mirror_to_github) 不能只取其中一个文件, 所以按需把单个文件取出来另外镜像,
+    记在 shares.github_items 里, 删除分享时一起从 GitHub 删掉 (见 _github_cleanup)。
+    """
+    if not github_mirror.enabled():
+        return None
+    with _mirror_lock(("item", share_id)):
+        with connect() as conn:
+            row = conn.execute("SELECT * FROM shares WHERE id=? AND active=1", (share_id,)).fetchone()
+        if not row or row["type"] != "file":
+            return None
+        zip_path = settings.data_dir / row["storage_path"]
+        entry, info = bundles.entry_info(zip_path, row, idx)  # 不存在时抛 EntryNotFound
+        items = _github_items(row)
+        hit = items.get(str(idx))
+        if not hit:
+            if not github_mirror.fits(info.file_size):
+                return None
+            tmp = settings.data_dir / f".gh-{secrets.token_hex(8)}"
+            try:
+                with open(tmp, "wb") as out:
+                    for chunk in bundles.iter_entry(zip_path, info, 1024 * 1024):
+                        out.write(chunk)
+                result = github_mirror.mirror(f"{row['token']}-{idx}", entry["name"], str(tmp))
+            except Exception:
+                logger.exception("github item mirror error")
+                result = None
+            finally:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+            if not result:
+                return None
+            hit = list(result)
+            items[str(idx)] = hit
+            with connect() as conn:
+                updated = conn.execute("UPDATE shares SET github_items=? WHERE id=? AND active=1",
+                                       (json.dumps(items), share_id)).rowcount
+            if not updated:
+                # 上传期间分享已被删除 / 过期, 删掉刚传上去的副本以免成为孤儿
+                github_mirror.delete(*hit)
+                return None
+            log_event("system", "GITHUB_MIRROR", "SUCCESS", share_id, f"ITEM={idx} PATH={hit[0]}")
+    try:
+        url = github_mirror.temp_download_url(hit[0])
+    except Exception:
+        logger.exception("github temp url error")
+        return None
+    if not url:
+        return None
+    return {"url": url, "filename": github_mirror.download_filename(hit[0], hit[1], entry["name"])}
 
 
 def touch_download(share_id, ip, user_agent, encrypted=False):

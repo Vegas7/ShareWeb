@@ -25,7 +25,7 @@ from .security import (utcnow, iso, require_admin_session, admin_locked_until, r
                        clear_admin_failures)
 from .services import (SPECIAL_CODE, RedeemBlocked, cleanup_expired, cleanup_old_files, create_share_file, create_share_text,
                        delete_files, evict_for_space, evictable_files, get_active_file_by_sha256, get_github_download_url,
-                       get_share_by_token, list_files, log_event, mirror_to_github, redeem_code, set_bundle, set_files_locked,
+                       get_github_item_url, get_share_by_token, list_files, log_event, mirror_to_github, redeem_code, set_bundle, set_files_locked,
                        share_status, touch_download)
 from .storage import save_upload_stream, save_text, cleanup_stale_uploads, UploadTooLarge, BadUpload, DiskFull, safe_delete
 from . import crypto
@@ -352,7 +352,8 @@ async def share_meta(token: str, request: Request):
     enc_key = row["enc_key"] if row["type"] == "file" else None
     github_available = github_mirror.enabled() and row["type"] == "file" and github_mirror.fits(row["size"] or 0)
     bundle = bundles.public_entries(row) if row["type"] == "file" else None
-    return {"bundle": bundle, "token": row["token"], "code": row["code"], "url": f"{settings.public_base_url}/share/{row['token']}", "type": row["type"], "filename": row["original_name"], "size": row["size"], "sha256": row["sha256"], "mime_type": row["mime_type"], "text": text, "created_at": row["created_at"], "expires_at": None if row["locked"] else row["expires_at"], "download_count": row["download_count"], "enc_key": enc_key, "github": github_available}
+    # github_items: 多文件分享里的单个文件也能通过 GitHub 下载
+    return {"bundle": bundle, "github_items": bool(bundle) and github_mirror.enabled(), "token": row["token"], "code": row["code"], "url": f"{settings.public_base_url}/share/{row['token']}", "type": row["type"], "filename": row["original_name"], "size": row["size"], "sha256": row["sha256"], "mime_type": row["mime_type"], "text": text, "created_at": row["created_at"], "expires_at": None if row["locked"] else row["expires_at"], "download_count": row["download_count"], "enc_key": enc_key, "github": github_available}
 
 
 @app.get("/api/share/{token}/github")
@@ -372,6 +373,24 @@ async def share_github_url(token: str, request: Request):
         raise HTTPException(503, "github mirror not ready, please retry")
     log_event(ip, "GITHUB_LINK", "SUCCESS", row["id"], "", request.headers.get("user-agent", "-"))
     # filename: 通过该链接下载后的实际文件名 (大文件走 Release 时 GitHub 会去掉中文等字符)。
+    return {"url": link["url"], "filename": link["filename"]}
+
+@app.get("/api/share/{token}/item/{idx}/github")
+async def share_item_github_url(token: str, idx: int, request: Request):
+    """多文件分享里单个文件的 GitHub 短时效直链 (第一次请求时把该文件单独传到 GitHub)。"""
+    ip = ensure_not_blacklisted(request)
+    if not github_mirror.enabled():
+        raise HTTPException(404, "github mirror not configured")
+    row = get_share_by_token(token)
+    if not row or row["type"] != "file" or not bundles.entries(row):
+        raise HTTPException(404, "file not found or expired")
+    try:
+        link = await run_in_threadpool(get_github_item_url, row["id"], idx)
+    except bundles.EntryNotFound:
+        raise HTTPException(404, "file not found")
+    if not link:
+        raise HTTPException(503, "github mirror not ready, please retry")
+    log_event(ip, "GITHUB_LINK", "SUCCESS", row["id"], f"ITEM={idx}", request.headers.get("user-agent", "-"))
     return {"url": link["url"], "filename": link["filename"]}
 
 @app.post("/api/redeem")

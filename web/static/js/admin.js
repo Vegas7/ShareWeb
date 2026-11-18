@@ -48,7 +48,7 @@ I18N.add({
     'admin.apiDocExamples': 'Examples', 'admin.apiDocResume': 'Resumable upload (large files)',
     'admin.apiDocFields': 'Share fields', 'admin.apiDocErrors': 'Status codes',
     'admin.apiColMethod': 'Method', 'admin.apiColPath': 'Path', 'admin.apiColDesc': 'Description',
-    'admin.apiLimits': 'On this server: files up to {file}, text up to {text}, shares kept for {days} days.', 'admin.apiNoLimit': 'no limit',
+    'admin.apiLimits': 'On this server: files up to {file}, text up to {text}, shares kept for {days} days.', 'admin.apiLimitsNoFile': 'On this server: no file size limit, text up to {text}, shares kept for {days} days.',
     'admin.apiAiTitle': 'For AI agents / LLMs',
     'admin.apiAiDesc': "A compact English version of this guide, written for language models. Give it to an AI agent together with an API key, and it can upload, share and fetch files on its own. An agent that has a key can also read it itself from <code>{url}</code>.",
     'admin.apiAiCopy': 'Copy for AI', 'admin.apiAiDownload': 'Download .md', 'admin.apiAiShow': 'Show document', 'admin.apiAiHide': 'Hide document',
@@ -130,7 +130,7 @@ I18N.add({
     'admin.apiDocExamples': '示例', 'admin.apiDocResume': '断点续传（大文件）',
     'admin.apiDocFields': '分享对象的字段', 'admin.apiDocErrors': '状态码',
     'admin.apiColMethod': '方法', 'admin.apiColPath': '路径', 'admin.apiColDesc': '说明',
-    'admin.apiLimits': '本服务器：单文件上限 {file}，文字上限 {text}，分享保留 {days} 天。', 'admin.apiNoLimit': '不限',
+    'admin.apiLimits': '本服务器：单文件上限 {file}，文字上限 {text}，分享保留 {days} 天。', 'admin.apiLimitsNoFile': '本服务器：单文件不限大小，文字上限 {text}，分享保留 {days} 天。',
     'admin.apiAiTitle': '给 AI 看的版本',
     'admin.apiAiDesc': '为 AI agent / 大语言模型整理的精简版说明（英文，模型理解起来最准确）。把它和 API 密钥一起交给 AI agent，它就能自己上传、分享和提取文件。已经拿到密钥的 agent 也可以自己读取：<code>{url}</code>。',
     'admin.apiAiCopy': '复制给 AI', 'admin.apiAiDownload': '下载 .md', 'admin.apiAiShow': '查看全文', 'admin.apiAiHide': '收起全文',
@@ -565,18 +565,22 @@ document.querySelectorAll('.api-code').forEach(pre => {
   };
   pre.appendChild(b);
 });
-fetch('/api/config').then(r => r.json()).then(c => {
-  setKey($('#apiLimits'), 'admin.apiLimits', {
-    file: c.max_upload_bytes == null ? { key: 'admin.apiNoLimit' } : fmtSize(c.max_upload_bytes),
-    text: fmtSize(c.max_text_bytes), days: c.retention_days });
-}).catch(() => {});
+// 「如何使用 API」里的上限说明: 打开页面、刷新数据、在「高级设置」里改了单文件上限后都重新读取
+function loadApiLimits() {
+  return fetch('/api/config', { cache: 'no-store' }).then(r => r.json()).then(c => {
+    const vars = { text: fmtSize(c.max_text_bytes), days: c.retention_days };
+    if (c.max_upload_bytes == null) setKey($('#apiLimits'), 'admin.apiLimitsNoFile', vars);
+    else setKey($('#apiLimits'), 'admin.apiLimits', { file: fmtSize(c.max_upload_bytes), ...vars });
+  }).catch(() => {});
+}
+loadApiLimits();
 
 const TZ = new Date().getTimezoneOffset();
 
 // 刷新全部数据; 统计接口失败 (未登录 / 会话过期) 时抛出
 async function load() {
   renderStats(await api('/api/admin/stats?tz=' + TZ));
-  await Promise.all([loadVisitors(), loadFiles(), loadOverview(), loadSettings(), loadApiKeys(), loadLlmDoc()]);
+  await Promise.all([loadVisitors(), loadFiles(), loadOverview(), loadSettings(), loadApiKeys(), loadLlmDoc(), loadApiLimits()]);
 }
 
 function showPanel(on) {
@@ -959,6 +963,8 @@ $('#limitSave').onclick = async () => {
     adminSettings = await api('/api/admin/settings', { max_upload_mb: mb }, 'PUT');
     renderSettings();
     setKey($('#limitMsg'), 'admin.limitSaved');
+    // API 说明和给 AI 的文档里也写着单文件上限
+    loadApiLimits(); loadLlmDoc().catch(() => {});
   } catch (e) {
     setKey($('#limitMsg'), 'admin.lockFailed', { msg: e.message });
   }

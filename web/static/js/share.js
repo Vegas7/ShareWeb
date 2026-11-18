@@ -65,6 +65,10 @@ I18N.add({
     'bundle.next': 'Next',
     'bundle.close': 'Close',
     'bundle.noPreview': 'No preview',
+    'bundle.github': 'GitHub',
+    'bundle.ghLoading': 'Fetching…',
+    'bundle.ghOpen': 'Open the GitHub download',
+    'bundle.ghReady': 'The GitHub download should open in a new tab. If it doesn\'t, use this link (it expires in a few minutes):',
   },
   zh: {
     'share.pageTitle': '共享内容 · ShareWeb',
@@ -132,6 +136,10 @@ I18N.add({
     'bundle.next': '下一张',
     'bundle.close': '关闭',
     'bundle.noPreview': '无法预览',
+    'bundle.github': 'GitHub 下载',
+    'bundle.ghLoading': '正在获取…',
+    'bundle.ghOpen': '打开 GitHub 下载',
+    'bundle.ghReady': 'GitHub 下载会在新标签页打开；若没有打开，请点这个链接（几分钟后失效）：',
   },
 });
 const t = I18N.t, S = I18N.span, H = I18N.htmlSpan, setKey = I18N.setKey;
@@ -420,7 +428,7 @@ function renderFile(d, filename, exp) {
     </div>`;
 
   bindCodeAndSha(d);
-  if (bundle) bindBundle(bundle);
+  if (bundle) bindBundle(bundle, d);
 
   const mediaEl = document.querySelector('#mediaEl');
   if (mediaEl) {
@@ -531,7 +539,8 @@ function bundleHtml(bundle) {
   return html;
 }
 
-function bindBundle(bundle) {
+function bindBundle(bundle, d) {
+  ghItems = !!d.github_items;
   const images = bundle.map((e, i) => ({ ...e, i })).filter(e => e.view);
   const gallery = document.querySelector('#gallery');
   if (!gallery) return;
@@ -553,7 +562,7 @@ function bindBundle(bundle) {
 }
 
 // 大图浏览: ← → 切换, Esc 关闭, 手机上左右滑动切换
-let lb = null;
+let lb = null, ghItems = false;
 function openLightbox(images, start) {
   if (!lb) lb = buildLightbox();
   lb.images = images;
@@ -581,6 +590,7 @@ function showSlide(k) {
   lb.dl.href = dlUrl(e.i); lb.dl.setAttribute('download', e.name);
   lb.root.classList.toggle('single', n === 1);
   setKey(lb.msg, null);
+  lb.ghBtn.disabled = false; setKey(lb.ghLabel, 'bundle.github');
   // 先显示已经加载过的缩略图, 原图到了再换上
   lb.img.classList.remove('broken');
   lb.img.alt = e.name;
@@ -613,12 +623,13 @@ function buildLightbox() {
       <div class="lb-actions">
         <button type="button" class="primary" id="lbCopy" data-i18n="bundle.copy">${esc(t('bundle.copy'))}</button>
         <a class="primary accent button" id="lbDl" data-i18n="bundle.download">${esc(t('bundle.download'))}</a>
+        <button type="button" class="primary${ghItems ? '' : ' hidden'}" id="lbGh">${GITHUB_ICON}<span data-i18n="bundle.github">${esc(t('bundle.github'))}</span></button>
       </div>
       <div class="lb-msg meta"></div>
     </div>`;
   document.body.appendChild(root);
   const q = sel => root.querySelector(sel);
-  const o = { root, img: q('.lb-img'), count: q('.lb-count'), name: q('.lb-name'), dl: q('#lbDl'), msg: q('.lb-msg'), closeBtn: q('.lb-close'), k: 0, images: [] };
+  const o = { root, img: q('.lb-img'), count: q('.lb-count'), name: q('.lb-name'), dl: q('#lbDl'), msg: q('.lb-msg'), closeBtn: q('.lb-close'), ghBtn: q('#lbGh'), ghLabel: q('#lbGh span'), k: 0, images: [] };
   o.img.addEventListener('error', () => o.img.classList.add('broken'));
   o.img.addEventListener('load', () => o.img.classList.remove('broken'));
   q('.lb-close').onclick = closeLightbox;
@@ -630,6 +641,31 @@ function buildLightbox() {
     const btn = e.currentTarget, x = o.images[o.k];
     if (await copyImage(viewUrl(x, x.i))) flash(btn, 'bundle.copied', 'bundle.copy');
     else setKey(o.msg, 'share.noImageClipboard');
+  };
+  // 通过 GitHub 下载当前这张: 先同步打开空白页 (await 之后再 window.open 会被浏览器拦截), 拿到直链后跳转
+  o.ghBtn.onclick = async () => {
+    const k = o.k, x = o.images[k];
+    const win = window.open('', '_blank');
+    o.ghBtn.disabled = true; setKey(o.ghLabel, 'bundle.ghLoading'); setKey(o.msg, null);
+    const slow = setTimeout(() => setKey(o.ghLabel, 'gh.preparing'), 3000);
+    try {
+      const r = await fetch(`/api/share/${encodeURIComponent(token)}/item/${x.i}/github`);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.url) throw new Error(j.detail || t('gh.unavailable'));
+      if (win) { win.opener = null; win.location.href = j.url; }
+      if (o.k === k) {
+        o.msg.innerHTML = `${S('bundle.ghReady')} <a href="${esc(j.url)}" target="_blank" rel="noopener">${S('bundle.ghOpen')}</a>` +
+          (j.filename && j.filename !== x.name ? `<br>${S('gh.renamed', { name: j.filename, orig: x.name })}` : '');
+        setKey(o.ghLabel, 'bundle.github');
+      }
+    } catch (e) {
+      if (win) win.close();
+      if (o.k === k) { setKey(o.msg, 'gh.failed', { msg: e.message }); setKey(o.ghLabel, 'bundle.github'); }
+    } finally {
+      clearTimeout(slow);
+      if (o.k === k) o.ghBtn.disabled = false;
+      else setKey(o.ghLabel, 'bundle.github');
+    }
   };
   document.addEventListener('keydown', e => {
     if (root.classList.contains('hidden')) return;
