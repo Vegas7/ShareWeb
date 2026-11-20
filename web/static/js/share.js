@@ -55,8 +55,6 @@ I18N.add({
     'bundle.images': 'Images · {n}',
     'bundle.files': 'Other files · {n}',
     'bundle.downloadAll': '⬇️ Download all (.zip)',
-    'bundle.copyLinks': 'Copy all image links',
-    'bundle.copiedLinks': 'Links copied ✓',
     'bundle.copy': '📋 Copy',
     'bundle.copied': 'Copied ✓',
     'bundle.download': '⬇️ Download',
@@ -126,8 +124,6 @@ I18N.add({
     'bundle.images': '图片 · {n}',
     'bundle.files': '其他文件 · {n}',
     'bundle.downloadAll': '⬇️ 全部下载（.zip）',
-    'bundle.copyLinks': '复制全部图片链接',
-    'bundle.copiedLinks': '已复制链接 ✓',
     'bundle.copy': '📋 复制',
     'bundle.copied': '已复制 ✓',
     'bundle.download': '⬇️ 下载',
@@ -521,7 +517,6 @@ function bundleHtml(bundle) {
     html += `
       <div class="bundle-head">
         <span class="copy-label">${S('bundle.images', { n: images.length })}</span>
-        <button type="button" class="link-btn" id="copyLinksBtn" data-i18n="bundle.copyLinks">${esc(t('bundle.copyLinks'))}</button>
       </div>
       <div class="gallery" id="gallery">${tiles}</div>`;
   }
@@ -554,11 +549,6 @@ function bindBundle(bundle, d) {
     });
   });
   gallery.querySelectorAll('.g-open').forEach(b => { b.onclick = () => openLightbox(images, Number(b.dataset.k)); });
-  const linksBtn = document.querySelector('#copyLinksBtn');
-  linksBtn.onclick = async () => {
-    await copy(images.map(e => location.origin + itemUrl(e.i)).join('\n'));
-    flash(linksBtn, 'bundle.copiedLinks', 'bundle.copyLinks');
-  };
 }
 
 // 大图浏览: ← → 切换, Esc 关闭, 手机上左右滑动切换

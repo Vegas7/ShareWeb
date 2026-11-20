@@ -573,8 +573,6 @@ html.admin-page{scrollbar-gutter:stable}
 
 /* ---- 多文件分享: 图库 + 文件列表 + 大图浏览 (share.js) ---- */
 .bundle-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:16px 0 8px}
-.link-btn{border:0;background:none;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--accent);cursor:pointer}
-.link-btn:hover{text-decoration:underline}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .g-tile{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--card-border);background:color-mix(in srgb,var(--muted) 10%,var(--card))}
 .g-open{display:block;width:100%;aspect-ratio:1;padding:0;border:0;background:none;cursor:zoom-in}
