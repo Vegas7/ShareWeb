@@ -569,7 +569,7 @@ function openLightbox(images, start) {
   lb.root.classList.remove('hidden');
   document.documentElement.classList.add('lb-open');
   lb.prevFocus = document.activeElement;
-  showSlide(start);
+  showSlide(start, 0);
   lb.closeBtn.focus({ preventScroll: true });
 }
 function closeLightbox() {
@@ -579,10 +579,12 @@ function closeLightbox() {
   lb.img.removeAttribute('src');
   if (lb.prevFocus && lb.prevFocus.focus) lb.prevFocus.focus({ preventScroll: true });
 }
-function showSlide(k) {
+// dir: 1 下一张 / -1 上一张 (滑动切换), 0 刚打开 (淡入)
+function showSlide(k, dir = 0) {
   const n = lb.images.length;
   k = (k + n) % n;
   lb.k = k;
+  slideOut(dir);
   const e = lb.images[k];
   const full = viewUrl(e, e.i), thumb = thumbUrl(e, e.i);
   lb.count.textContent = `${k + 1} / ${n}`;
@@ -591,18 +593,44 @@ function showSlide(k) {
   lb.root.classList.toggle('single', n === 1);
   setKey(lb.msg, null);
   lb.ghBtn.disabled = false; setKey(lb.ghLabel, 'bundle.github');
-  // 先显示已经加载过的缩略图, 原图到了再换上
-  lb.img.classList.remove('broken');
+  lb.img.classList.remove('broken', 'natural');
   lb.img.alt = e.name;
-  lb.img.src = thumb || full;
-  if (thumb && thumb !== full) {
-    const pre = new Image();
-    pre.onload = () => { if (lb.k === k) lb.img.src = full; };
-    pre.src = full;
-  }
+  // 原图已在缓存里 (前后两张会预取) 就直接显示原图, 否则先显示缩略图, 原图到了再换上
+  const pre = new Image();
+  pre.src = full;
+  const ready = pre.complete && pre.naturalWidth > 0;
+  lb.img.src = ready || !thumb ? full : thumb;
+  lb.full = full;
+  slideIn(dir);
+  if (!ready && thumb && thumb !== full) pre.onload = () => { if (lb.k === k) lb.img.src = full; };
   // 预取前后两张
   [k - 1, k + 1].forEach(j => { const x = lb.images[(j + n) % n]; if (x) new Image().src = viewUrl(x, x.i); });
 }
+const reducedMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SLIDE_PX = 90;
+// 切换时把当前这张复制一份留在原位, 往反方向滑出并淡出
+function slideOut(dir) {
+  const img = lb.img;
+  if (!dir || reducedMotion() || !img.animate || !img.getAttribute('src') || img.classList.contains('broken')) return;
+  const r = img.getBoundingClientRect(), sr = lb.stage.getBoundingClientRect();
+  if (!r.width) return;
+  const ghost = img.cloneNode(false);
+  ghost.className = 'lb-ghost';
+  ghost.alt = '';
+  Object.assign(ghost.style, { left: `${r.left - sr.left}px`, top: `${r.top - sr.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  lb.stage.insertBefore(ghost, img);
+  ghost.animate([{ transform: 'translateX(0)', opacity: 1 }, { transform: `translateX(${-dir * SLIDE_PX}px)`, opacity: 0 }],
+    { duration: 240, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' }).onfinish = () => ghost.remove();
+}
+// 新的一张从前进方向滑入 (刚打开时轻微放大淡入)
+function slideIn(dir) {
+  if (reducedMotion() || !lb.img.animate) return;
+  if (lb.anim) lb.anim.cancel();
+  const from = dir ? { transform: `translateX(${dir * SLIDE_PX}px)`, opacity: 0 } : { transform: 'scale(.96)', opacity: 0 };
+  lb.anim = lb.img.animate([from, { transform: 'none', opacity: 1 }],
+    { duration: dir ? 300 : 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+}
+const CHEVRON = d => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 function buildLightbox() {
   const root = document.createElement('div');
   root.className = 'lightbox hidden';
@@ -615,9 +643,9 @@ function buildLightbox() {
       <button type="button" class="lb-btn lb-close" data-i18n-title="bundle.close" title="${esc(t('bundle.close'))}" aria-label="${esc(t('bundle.close'))}">✕</button>
     </div>
     <div class="lb-stage">
-      <button type="button" class="lb-btn lb-nav lb-prev" data-i18n-title="bundle.prev" title="${esc(t('bundle.prev'))}" aria-label="${esc(t('bundle.prev'))}">‹</button>
+      <button type="button" class="lb-btn lb-nav lb-prev" data-i18n-title="bundle.prev" title="${esc(t('bundle.prev'))}" aria-label="${esc(t('bundle.prev'))}">${CHEVRON('m15 5-7 7 7 7')}</button>
       <img class="lb-img" alt="">
-      <button type="button" class="lb-btn lb-nav lb-next" data-i18n-title="bundle.next" title="${esc(t('bundle.next'))}" aria-label="${esc(t('bundle.next'))}">›</button>
+      <button type="button" class="lb-btn lb-nav lb-next" data-i18n-title="bundle.next" title="${esc(t('bundle.next'))}" aria-label="${esc(t('bundle.next'))}">${CHEVRON('m9 5 7 7-7 7')}</button>
     </div>
     <div class="lb-bottom">
       <div class="lb-actions">
@@ -629,14 +657,30 @@ function buildLightbox() {
     </div>`;
   document.body.appendChild(root);
   const q = sel => root.querySelector(sel);
-  const o = { root, img: q('.lb-img'), count: q('.lb-count'), name: q('.lb-name'), dl: q('#lbDl'), msg: q('.lb-msg'), closeBtn: q('.lb-close'), ghBtn: q('#lbGh'), ghLabel: q('#lbGh span'), k: 0, images: [] };
+  const o = { root, img: q('.lb-img'), count: q('.lb-count'), name: q('.lb-name'), dl: q('#lbDl'), msg: q('.lb-msg'), stage: q('.lb-stage'), closeBtn: q('.lb-close'), ghBtn: q('#lbGh'), ghLabel: q('#lbGh span'), k: 0, images: [] };
   o.img.addEventListener('error', () => o.img.classList.add('broken'));
-  o.img.addEventListener('load', () => o.img.classList.remove('broken'));
+  o.img.addEventListener('load', () => {
+    o.img.classList.remove('broken');
+    // 图片铺满舞台显示 (缩略图换成原图时大小不跳); 原图本来就比舞台小时按原尺寸显示, 不放大
+    if (o.img.src === new URL(o.full || '', location.href).href) {
+      o.img.classList.remove('natural');
+      const r = o.img.getBoundingClientRect();
+      if (o.img.naturalWidth <= r.width && o.img.naturalHeight <= r.height) o.img.classList.add('natural');
+    }
+  });
   q('.lb-close').onclick = closeLightbox;
-  q('.lb-prev').onclick = () => showSlide(o.k - 1);
-  q('.lb-next').onclick = () => showSlide(o.k + 1);
-  // 点图片以外的空白处关闭
-  q('.lb-stage').addEventListener('click', e => { if (e.target === e.currentTarget) closeLightbox(); });
+  q('.lb-prev').onclick = () => showSlide(o.k - 1, -1);
+  q('.lb-next').onclick = () => showSlide(o.k + 1, 1);
+  // 点图片以外的空白处关闭 (图片元素铺满舞台, 两侧留白也属于它, 按实际画面范围判断)
+  q('.lb-stage').addEventListener('click', e => {
+    if (e.target === e.currentTarget) { closeLightbox(); return; }
+    if (e.target !== o.img || !o.img.naturalWidth) return;
+    const r = o.img.getBoundingClientRect();
+    const s = Math.min(r.width / o.img.naturalWidth, r.height / o.img.naturalHeight);
+    const w = o.img.naturalWidth * s, h = o.img.naturalHeight * s;
+    const x = e.clientX - r.left - (r.width - w) / 2, y = e.clientY - r.top - (r.height - h) / 2;
+    if (x < 0 || y < 0 || x > w || y > h) closeLightbox();
+  });
   q('#lbCopy').onclick = async e => {
     const btn = e.currentTarget, x = o.images[o.k];
     if (await copyImage(viewUrl(x, x.i))) flash(btn, 'bundle.copied', 'bundle.copy');
@@ -670,8 +714,8 @@ function buildLightbox() {
   document.addEventListener('keydown', e => {
     if (root.classList.contains('hidden')) return;
     if (e.key === 'Escape') { e.preventDefault(); closeLightbox(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); showSlide(o.k - 1); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); showSlide(o.k + 1); }
+    else if (e.key === 'ArrowLeft' && o.images.length > 1) { e.preventDefault(); showSlide(o.k - 1, -1); }
+    else if (e.key === 'ArrowRight' && o.images.length > 1) { e.preventDefault(); showSlide(o.k + 1, 1); }
   });
   let x0 = null, y0 = null;
   root.addEventListener('touchstart', e => { if (e.touches.length === 1) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } }, { passive: true });
@@ -679,7 +723,7 @@ function buildLightbox() {
     if (x0 === null) return;
     const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
     x0 = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showSlide(o.k + (dx < 0 ? 1 : -1));
+    if (o.images.length > 1 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showSlide(o.k + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
   }, { passive: true });
   return o;
 }
